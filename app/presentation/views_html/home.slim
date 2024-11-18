@@ -41,7 +41,9 @@ div.container.mt-5
     section.history-section
       .card
         .card-header.bg-light
-          h2.h4.mb-0 Recently Decoded Dishes
+          h2.h4.mb-0 
+            | Recently Decoded Dishes 
+            span.text-muted = "(#{dishes.count})"
         .card-body
           ul.list-group.list-group-flush
             - dishes.each do |dish|

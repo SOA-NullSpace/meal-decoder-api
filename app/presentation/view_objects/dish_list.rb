@@ -4,11 +4,17 @@ module MealDecoder
     # Handles iteration and counting of dish entities
     class DishesList
       def initialize(dishes)
-        @dishes = dishes.map { |dish| Dish.new(dish) }
+        puts "DishesList initializing with #{dishes.length} dishes"
+        @dishes = dishes.map do |dish|
+          puts "Creating view for dish: #{dish.name}"
+          Dish.new(dish)
+        end
       end
 
       def any?
-        @dishes.any?
+        result = @dishes.any?
+        puts "DishesList#any? returning: #{result}"
+        result
       end
 
       def each(&block)

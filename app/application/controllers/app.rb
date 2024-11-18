@@ -38,19 +38,23 @@ module MealDecoder
 
       # GET / - Home page with search history
       routing.root do
-        # Step 1: Initialize session if needed
+        # Ensure session exists
         session[:searched_dishes] ||= []
+        puts "ROOT - Session before processing: #{session[:searched_dishes].inspect}"
 
         begin
-          # Step 2: Load dishes from search history in database
+          # Load dishes from search history
           dishes = session[:searched_dishes].map do |dish_name|
-            Services::FetchDish.new.call(dish_name).value_or(nil)
+            puts "Attempting to fetch dish: #{dish_name}"
+            result = Services::FetchDish.new.call(dish_name)
+            result.value_or(nil)
           end.compact
 
-          # Step 3: Update session with valid dishes only
+          # Update session with valid dishes
           session[:searched_dishes] = dishes.map(&:name)
+          puts "ROOT - Session after processing: #{session[:searched_dishes].inspect}"
 
-          # Step 4: Render home page with dishes
+          # Render view
           view 'home', locals: {
             title_suffix: 'Home',
             dishes: Views::DishesList.new(dishes)
@@ -68,35 +72,35 @@ module MealDecoder
       # POST /fetch_dish - Create or retrieve dish information
       routing.on 'fetch_dish' do
         routing.post do
-          # Step 1: Validate form input
+          puts "FETCH - Session before processing: #{session[:searched_dishes].inspect}"
+
           form = Forms::NewDish.new.call(routing.params)
           if form.failure?
             flash[:error] = form.errors.messages.first.text
             routing.redirect '/'
           end
 
-          # Step 2: Process dish creation/retrieval
           result = Services::CreateDish.new.call(
             dish_name: form.to_h[:dish_name],
             session:
           )
 
-          # Step 3: Handle the result
           case result
           when Success
-            # Step 4a: Redirect to dish display on success
+            dish = result.value!
+            # Ensure the dish is added to session
+            session[:searched_dishes] ||= []
+            session[:searched_dishes].unshift(dish.name)
+            session[:searched_dishes].uniq!
+
+            puts "FETCH - Session after processing: #{session[:searched_dishes].inspect}"
+
             flash[:success] = 'Successfully added new dish!'
-            routing.redirect "/display_dish?name=#{CGI.escape(result.value!.name)}"
+            routing.redirect "/display_dish?name=#{CGI.escape(dish.name)}"
           when Failure
-            # Step 4b: Handle failure with appropriate error message
             flash[:error] = result.failure
             routing.redirect '/'
           end
-        rescue StandardError => e
-          # Handle unexpected errors
-          puts "FETCH DISH ERROR: #{e.message}"
-          flash[:error] = 'An error occurred while processing your request'
-          routing.redirect '/'
         end
       end
 

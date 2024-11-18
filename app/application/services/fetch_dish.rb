@@ -43,6 +43,7 @@ module MealDecoder
         @name = input[:dish_name]
         @dish = input[:dish]
         @session = input[:session]
+        ensure_session_array
       end
 
       def update_dish(new_dish)
@@ -58,16 +59,15 @@ module MealDecoder
       def add_to_history
         return self unless dish
 
-        SearchHistory.new(session).add(dish.name)
+        @session[:searched_dishes].unshift(dish.name)
+        @session[:searched_dishes].uniq!
         self
       end
 
-      def to_h
-        {
-          dish_name: @name,
-          dish: @dish,
-          session: @session
-        }
+      private
+
+      def ensure_session_array
+        @session[:searched_dishes] ||= []
       end
     end
 
@@ -83,6 +83,7 @@ module MealDecoder
       private
 
       def validate_input(input)
+        puts "Validating input with dish_name: #{input[:dish_name]}"
         data = DishData.new(input)
         return Failure('Dish name is required') if data.name.to_s.empty?
 
@@ -90,6 +91,7 @@ module MealDecoder
       end
 
       def fetch_from_api(data)
+        puts "Fetching from API for dish: #{data.name}"
         dish = APIFactory.create_mapper.find(data.name)
         Success(data.update_dish(dish))
       rescue StandardError => api_error
@@ -97,13 +99,16 @@ module MealDecoder
       end
 
       def save_to_repository(data)
+        puts "Saving to repository: #{data.dish.name}"
         Success(data.save_to_repository)
       rescue StandardError => db_error
         Failure("Database Error: #{db_error.message}")
       end
 
       def add_to_history(data)
+        puts "Adding to history, session before: #{data.session[:searched_dishes]}"
         data.add_to_history
+        puts "Session after update: #{data.session[:searched_dishes]}"
         Success(data.dish)
       rescue StandardError => session_error
         Failure("Session Error: #{session_error.message}")

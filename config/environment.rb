@@ -4,14 +4,13 @@ require 'figaro'
 require 'roda'
 require 'sequel'
 require 'yaml'
+require 'rack/method_override'
 require 'rack/session'
+require 'rack'
 
 module MealDecoder
   # Configuration for the App
   class App < Roda
-    # use Rack::Session::Cookie, secret: config.SESSION_SECRET
-    plugin :environments
-
     # Environment variables setup using Figaro
     env = ENV['RACK_ENV'] || 'development'
     Figaro.application = Figaro::Application.new(
@@ -22,11 +21,25 @@ module MealDecoder
 
     def self.config = Figaro.env
 
-    # Session configuration moved here
+    plugin :environments
+    plugin :all_verbs
+    plugin :common_logger, $stderr
+    plugin :flash
+    plugin :public, root: 'app/presentation/assets'
     plugin :sessions,
            key: 'meal_decoder.session',
            secret: config.SESSION_SECRET,
-           expire_after: 2_592_000 # 30 days in seconds
+           cookie_options: {
+             max_age: 86_400 # 1 day in seconds
+           }
+
+    configure do
+      use Rack::MethodOverride
+      use Rack::Session::Cookie,
+          key: 'rack.session',
+          secret: config.SESSION_SECRET,
+          same_site: :strict
+    end
 
     configure :development, :test do
       require 'pry'
@@ -42,7 +55,7 @@ module MealDecoder
 
     # Database Setup
     DB = Sequel.connect(ENV.fetch('DATABASE_URL'))
-    def self.db = DB # Class accessor for database
+    def self.db = DB
 
     # Load all application files
     def self.setup_application!
