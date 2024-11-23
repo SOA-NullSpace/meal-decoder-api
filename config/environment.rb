@@ -33,6 +33,13 @@ module MealDecoder
              max_age: 86_400 # 1 day in seconds
            }
 
+    # Set API_HOST based on the environment
+    @@api_host = ENV['RACK_ENV'] == 'production' ? 'https://your-production-url.com' : 'http://localhost:9292'
+
+    def self.api_host
+      @@api_host
+    end
+
     configure do
       use Rack::MethodOverride
       use Rack::Session::Cookie,

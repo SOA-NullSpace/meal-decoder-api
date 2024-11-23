@@ -12,6 +12,19 @@ module MealDecoder
       property :status
       property :message
       property :data, render_nil: true
+
+      def http_status_code
+        {
+          ok: 200,
+          created: 201,
+          forbidden: 403,
+          not_found: 404,
+          bad_request: 400,
+          conflict: 409,
+          cannot_process: 422,
+          internal_error: 500
+        }[represented.status]
+      end
     end
   end
 end

@@ -18,7 +18,7 @@ module MealDecoder
       property :calorie_level
 
       link :self do
-        "#{Api.config.API_HOST}/api/v1/dishes/#{name}"
+        "#{MealDecoder::App.api_host}/api/v1/dishes/#{name}"
       end
 
       private
