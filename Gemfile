@@ -16,6 +16,10 @@ gem 'dry-types', '1.7'
 # Networking
 gem 'http', '5.2'
 
+# PRESENTATION LAYER
+gem 'multi_json', '1.15'
+gem 'roar', '1.2'
+
 # Web Application
 gem 'logger', '1.6'
 gem 'puma', '6.4'
