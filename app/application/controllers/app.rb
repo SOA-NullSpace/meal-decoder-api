@@ -34,61 +34,90 @@ module MealDecoder
         routing.on 'v1' do
           routing.on 'dishes' do
             # GET /api/v1/dishes
-            routing.get do
-              begin
-                result = Services::FetchDish.new.call(routing.params['name'])
+            routing.get String do |dish_name|
+          begin
+            # Normalize the dish name before lookup
+            puts "GET request for dish: #{dish_name}"
+            result = Services::FetchDish.new.call(dish_name)
 
-                case result
-                when Success
-                  {
-                    status: 'success',
-                    data: {
-                      name: result.value!.name,
-                      ingredients: result.value!.ingredients,
-                      total_calories: result.value!.total_calories,
-                      calorie_level: result.value!.calorie_level
-                    }
-                  }
-                when Failure
-                  routing.halt(404, { error: result.failure })
-                end
-              rescue StandardError => e
-                puts "API ERROR: #{e.message}"
-                routing.halt(500, { error: 'API Error', message: e.message })
-              end
+            case result
+            when Success
+              {
+                status: 'success',
+                data: {
+                  name: result.value!.name,
+                  ingredients: result.value!.ingredients,
+                  total_calories: result.value!.total_calories,
+                  calorie_level: result.value!.calorie_level
+                }
+              }
+            when Failure
+              routing.halt(404, { error: result.failure })
             end
+          rescue StandardError => e
+            puts "API ERROR: #{e.message}"
+            routing.halt(500, { error: 'API Error', message: e.message })
+          end
+        end
 
-            # POST /api/v1/dishes
-            routing.post do
-              begin
-                dish_data = JSON.parse(routing.body.read)
-                result = Services::CreateDish.new.call(
-                  dish_name: dish_data['dish_name'],
-                  session: {}
-                )
+        # GET /api/v1/dishes - List all dishes
+        routing.get do
+          begin
+            result = Services::ListDishes.new.call
 
-                case result
-                when Success
-                  response.status = 201
-                  dish = result.value!
+            case result
+            when Success
+              {
+                status: 'success',
+                data: result.value!.map { |dish|
                   {
-                    status: 'success',
-                    message: 'Dish created successfully',
-                    data: {
-                      name: dish.name,
-                      ingredients: dish.ingredients,
-                      total_calories: dish.total_calories,
-                      calorie_level: dish.calorie_level
-                    }
+                    name: dish.name,
+                    ingredients: dish.ingredients,
+                    total_calories: dish.total_calories,
+                    calorie_level: dish.calorie_level
                   }
-                when Failure
-                  routing.halt(422, { error: result.failure })
-                end
-              rescue StandardError => e
-                puts "API ERROR: #{e.message}"
-                routing.halt(500, { error: 'API Error', message: e.message })
-              end
+                }
+              }
+            when Failure
+              routing.halt(404, { error: result.failure })
             end
+          rescue StandardError => e
+            puts "API ERROR: #{e.message}"
+            routing.halt(500, { error: 'API Error', message: e.message })
+          end
+        end
+
+        # POST /api/v1/dishes - Create new dish
+        routing.post do
+          begin
+            dish_data = JSON.parse(routing.body.read)
+            result = Services::CreateDish.new.call(
+              dish_name: dish_data['dish_name'],
+              session: {}
+            )
+
+            case result
+            when Success
+              response.status = 201
+              dish = result.value!
+              {
+                status: 'success',
+                message: 'Dish created successfully',
+                data: {
+                  name: dish.name,
+                  ingredients: dish.ingredients,
+                  total_calories: dish.total_calories,
+                  calorie_level: dish.calorie_level
+                }
+              }
+            when Failure
+              routing.halt(422, { error: result.failure })
+            end
+          rescue StandardError => e
+            puts "API ERROR: #{e.message}"
+            routing.halt(500, { error: 'API Error', message: e.message })
+          end
+        end
 
             # DELETE /api/v1/dishes/{name}
             routing.delete String do |dish_name|

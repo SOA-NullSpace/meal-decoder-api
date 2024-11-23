@@ -15,8 +15,8 @@ module MealDecoder
 
           db = Sequel::Model.db
           perform_deletion(db, id)
-        rescue Sequel::Error => database_error
-          handle_deletion_error(database_error)
+        rescue Sequel::Error => e
+          handle_deletion_error(e)
         end
 
         def self.perform_deletion(db, id)
@@ -36,14 +36,28 @@ module MealDecoder
         rebuild_entity Database::DishOrm.first(id:)
       end
 
+      # def self.find_name(name)
+      #   rebuild_entity Database::DishOrm.first(name:)
+      # end
       def self.find_name(name)
-        rebuild_entity Database::DishOrm.first(name:)
+        normalized_name = normalize_name(name)
+        puts "Looking up dish with normalized name: #{normalized_name}"
+        rebuild_entity Database::DishOrm.first(Sequel.function(:lower, :name) => normalized_name.downcase)
       end
 
+      # def self.create(entity)
+      #   return nil unless entity
+
+      #   db_dish = Database::DishOrm.find_or_create(name: entity.name)
+      #   handle_ingredients(db_dish, entity.ingredients)
+      #   rebuild_entity(db_dish)
+      # end
       def self.create(entity)
         return nil unless entity
 
-        db_dish = Database::DishOrm.find_or_create(name: entity.name)
+        normalized_name = normalize_name(entity.name)
+        puts "Creating dish with normalized name: #{normalized_name}"
+        db_dish = Database::DishOrm.find_or_create(name: normalized_name)
         handle_ingredients(db_dish, entity.ingredients)
         rebuild_entity(db_dish)
       end
@@ -75,6 +89,11 @@ module MealDecoder
 
       def self.calculate_calories(ingredients)
         ingredients.sum { |ingredient| Lib::NutritionCalculator.get_calories(ingredient.name) }
+      end
+
+      def self.normalize_name(name)
+        # Normalize to Title Case and handle whitespace
+        name.to_s.strip.split(/\s+/).map(&:capitalize).join(' ')
       end
     end
   end
