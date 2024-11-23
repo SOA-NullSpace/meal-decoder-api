@@ -2,6 +2,7 @@
 
 require 'roar/decorator'
 require 'roar/json'
+require_relative 'dish_representer'
 
 module MealDecoder
   module Representer
@@ -11,7 +12,8 @@ module MealDecoder
       include Roar::Hypermedia
       include Roar::Decorator::HypermediaConsumer
 
-      collection :dishes, extend: Representer::Dish, class: OpenStruct
+      # collection :dishes, extend: Representer::Dish, class: OpenStruct
+      collection :dishes, extend: MealDecoder::Representer::Dish, class: OpenStruct
 
       link :self do
         "#{Api.config.API_HOST}/api/v1/dishes"
