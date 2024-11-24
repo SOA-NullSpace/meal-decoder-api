@@ -12,6 +12,7 @@ require 'vcr'
 require 'webmock'
 require 'rack/test'
 require 'sequel'
+require 'ostruct'
 
 require_relative 'helpers/vcr_helper'
 require_relative 'helpers/database_helper'

@@ -11,12 +11,12 @@ module MealDecoder
       def call(dish_name)
         dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
         if dish
-          Dry::Monads::Success(dish)
+          Success(dish)
         else
-          Dry::Monads::Failure("Could not find dish: #{dish_name}")
+          Failure('Could not find that dish')
         end
       rescue StandardError => e
-        Failure(e.message)
+        Failure("Database error: #{e.message}")
       end
     end
 
@@ -75,31 +75,40 @@ module MealDecoder
 
       def call(input)
         if valid_input?(input)
-          begin
-            dish = APIFactory.create_mapper.find(input[:dish_name])
-            stored_dish = Repository::For.entity(dish).create(dish)
-
-            if stored_dish
-              # Add to session history if provided
-              input[:session][:searched_dishes]&.unshift(stored_dish.name)
-              input[:session][:searched_dishes]&.uniq!
-
-              Dry::Monads::Success(stored_dish)
-            else
-              Dry::Monads::Failure("Could not create dish")
-            end
-          rescue StandardError => e
-            Dry::Monads::Failure(e.message)
-          end
+          create_dish(input)
         else
-          Dry::Monads::Failure('Missing or empty dish name')
+          Failure('Missing or empty dish name')
         end
       end
 
       private
 
+      def create_dish(input)
+        dish = APIFactory.create_mapper.find(input[:dish_name])
+        stored_dish = Repository::For.entity(dish).create(dish)
+
+        if stored_dish
+          update_session(input[:session], stored_dish.name)
+          Success(stored_dish)
+        else
+          Failure('API Error: Could not create dish')
+        end
+      rescue MealDecoder::Gateways::OpenAIAPI::UnknownDishError => e
+        Failure("API Error: #{e.message}")
+      rescue StandardError => e
+        Failure("API Error: #{e.message}")
+      end
+
       def valid_input?(input)
         input[:dish_name] && !input[:dish_name].empty?
+      end
+
+      def update_session(session, dish_name)
+        return unless session
+
+        session[:searched_dishes] ||= []
+        session[:searched_dishes].unshift(dish_name)
+        session[:searched_dishes].uniq!
       end
     end
 
@@ -169,13 +178,11 @@ module MealDecoder
 
         if dish.nil?
           Failure("Could not find dish: #{dish_name}")
+        elsif Repository::For.klass(Entity::Dish).delete(dish_name)
+          session[:searched_dishes]&.delete(dish_name)
+          Success(dish_name)
         else
-          if Repository::For.klass(Entity::Dish).delete(dish_name)
-            session[:searched_dishes]&.delete(dish_name)
-            Success(dish_name)
-          else
-            Failure('Could not delete dish')
-          end
+          Failure('Could not delete dish')
         end
       rescue StandardError => e
         Failure(e.message)
@@ -187,18 +194,26 @@ module MealDecoder
       include Dry::Monads[:result]
 
       def call(image_file)
-        return Dry::Monads::Failure("No image file provided") if image_file.nil?
-        return Dry::Monads::Failure("Invalid image format") unless valid_image?(image_file)
+        return Failure('No image file provided') if image_file.nil?
 
-        begin
-          text = api.detect_text(image_file[:tempfile].path)
-          Dry::Monads::Success(text)
-        rescue StandardError => e
-          Dry::Monads::Failure(e.message)
-        end
+        validate_image(image_file)
+          .bind { |valid_file| detect_text(valid_file) }
       end
 
       private
+
+      def validate_image(file)
+        return Failure('Invalid file format') unless valid_image?(file)
+
+        Success(file)
+      end
+
+      def detect_text(file)
+        text = api.detect_text(file[:tempfile].path)
+        Success(text)
+      rescue StandardError => e
+        Failure("Text detection error: #{e.message}")
+      end
 
       def api
         @api ||= Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
