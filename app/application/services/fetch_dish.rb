@@ -1,25 +1,10 @@
 # frozen_string_literal: true
 
 require 'dry/monads'
+require 'dry/validation'
 
 module MealDecoder
   module Services
-    # Service to fetch dish details
-    class FetchDish
-      include Dry::Monads[:result]
-
-      def call(dish_name)
-        dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
-        if dish
-          Success(dish)
-        else
-          Failure('Could not find that dish')
-        end
-      rescue StandardError => e
-        Failure("Database error: #{e.message}")
-      end
-    end
-
     # Factory for creating API-related objects
     class APIFactory
       def self.create_gateway
@@ -33,159 +18,157 @@ module MealDecoder
       end
     end
 
-    # Data container for dish creation process
-    class DishData
-      attr_reader :name, :dish, :session
+    # Manages session history for dishes
+    class SessionManager
+      include Dry::Monads[:result]
 
-      def initialize(input)
-        @name = input[:dish_name]
-        @dish = input[:dish]
-        @session = input[:session]
-        ensure_session_array
+      def self.update_history(session, dish_name)
+        searched_dishes = session[:searched_dishes] ||= []
+        searched_dishes.unshift(dish_name)
+        searched_dishes.uniq!
+        Success(dish_name)
       end
 
-      def update_dish(new_dish)
-        @dish = new_dish
-        self
-      end
-
-      def save_to_repository
-        dish_repo = DishRepository.new
-        update_dish(dish_repo.save_dish(name, dish))
-      end
-
-      def add_to_history
-        return self unless dish
-
-        @session[:searched_dishes].unshift(dish.name)
-        @session[:searched_dishes].uniq!
-        self
-      end
-
-      private
-
-      def ensure_session_array
-        @session[:searched_dishes] ||= []
+      class << self
+        include Dry::Monads[:result]
       end
     end
 
-    # Service to create new dish from API
+    # Represents a dish operation result
+    class DishResult
+      def initialize(result, session_manager = SessionManager)
+        @result = result
+        @session_manager = session_manager
+      end
+
+      def success?
+        @result.success?
+      end
+
+      def value
+        return nil unless success?
+        @result.value!
+      end
+
+      def value!
+        @result.value!
+      end
+
+      def error
+        @result.failure
+      end
+
+      def update_session(session)
+        return self unless success?
+
+        @session_manager.update_history(session, value!.name)
+        self
+      end
+
+      def to_monad
+        @result
+      end
+    end
+
+    # Result handler for dish operations
+    class ResultHandler
+      def initialize(session_manager = SessionManager)
+        @session_manager = session_manager
+      end
+
+      def handle_dish_result(monad_result, session)
+        DishResult.new(monad_result, @session_manager)
+          .update_session(session)
+          .to_monad
+      end
+    end
+
+    # Service to fetch dish details
+    class FetchDish
+      include Dry::Monads[:result]
+
+      def call(dish_name)
+        dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
+        if dish
+          Success(dish)
+        else
+          Failure("Could not find that dish")
+        end
+      rescue StandardError => error
+        Failure("Database error: #{error.message}")
+      end
+    end
+
+    # Service to create new dish from API and store in repository
     class CreateDish
       include Dry::Monads[:result]
 
+      def initialize(validator: Validation::DishContract.new,
+                    result_handler: ResultHandler.new)
+        @validator = validator
+        @result_handler = result_handler
+      end
+
       def call(input)
-        if valid_input?(input)
-          create_dish(input)
-        else
-          Failure('Missing or empty dish name')
-        end
+        validate(input)
+          .bind { |data| process_dish(data) }
       end
 
       private
 
-      def create_dish(input)
-        dish = APIFactory.create_mapper.find(input[:dish_name])
-        stored_dish = Repository::For.entity(dish).create(dish)
-
-        if stored_dish
-          update_session(input[:session], stored_dish.name)
-          Success(stored_dish)
+      def validate(input)
+        validation = @validator.call(dish_name: input[:dish_name])
+        if validation.success?
+          Success(input)
         else
-          Failure('API Error: Could not create dish')
+          Failure(validation.errors.to_h)
         end
-      rescue MealDecoder::Gateways::OpenAIAPI::UnknownDishError => e
-        Failure("API Error: #{e.message}")
-      rescue StandardError => e
-        Failure("API Error: #{e.message}")
       end
 
-      def valid_input?(input)
-        input[:dish_name] && !input[:dish_name].empty?
+      def process_dish(input)
+        dish_result = create_and_store_dish(input[:dish_name])
+        @result_handler.handle_dish_result(dish_result, input[:session])
+      rescue StandardError => error
+        Failure("API Error: #{error.message}")
       end
 
-      def update_session(session, dish_name)
-        return unless session
-
-        session[:searched_dishes] ||= []
-        session[:searched_dishes].unshift(dish_name)
-        session[:searched_dishes].uniq!
+      def create_and_store_dish(dish_name)
+        dish = APIFactory.create_mapper.find(dish_name)
+        stored_dish = Repository::For.entity(dish).create(dish)
+        Success(stored_dish)
       end
     end
 
-    # Handles dish repository operations
-    class DishRepository
+    # Service to remove a dish and update session
+    class RemoveDish
+      include Dry::Monads[:result]
+
       def initialize
         @repository = Repository::For.klass(Entity::Dish)
       end
 
-      def save_dish(dish_name, dish)
-        delete_existing_dish(dish_name)
-        @repository.create(dish)
-      end
-
-      private
-
-      def delete_existing_dish(dish_name)
-        return unless (existing = @repository.find_name(dish_name))
-
-        @repository.delete(existing.id)
-      end
-    end
-
-    # Manages search history in session
-    class SearchHistory
-      def initialize(session)
-        @session = session
-        ensure_history_exists
-      end
-
-      def add(dish_name)
-        searched_dishes.insert(0, dish_name)
-        searched_dishes.uniq!
-      end
-
-      def remove(dish_name)
-        searched_dishes.delete(dish_name)
-      end
-
-      private
-
-      def searched_dishes
-        @session[:searched_dishes]
-      end
-
-      def ensure_history_exists
-        @session[:searched_dishes] ||= []
-      end
-    end
-
-    class ListDishes
-      include Dry::Monads[:result]
-
-      begin
-        dishes = Repository::For.klass(Entity::Dish).all
-        Dry::Monads::Success(dishes)
-      rescue StandardError => e
-        Dry::Monads::Failure("Could not list dishes: #{e.message}")
-      end
-    end
-
-    class RemoveDish
-      include Dry::Monads[:result]
-
       def call(dish_name:, session: {})
-        dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
+        remove_dish(dish_name).bind { |deleted_name|
+          update_session(session, deleted_name)
+        }
+      end
 
-        if dish.nil?
-          Failure("Could not find dish: #{dish_name}")
-        elsif Repository::For.klass(Entity::Dish).delete(dish_name)
-          session[:searched_dishes]&.delete(dish_name)
+      private
+
+      def remove_dish(dish_name)
+        dish = @repository.find_name(dish_name)
+        return Failure("Could not find dish: #{dish_name}") unless dish
+
+        if @repository.delete(dish_name)
           Success(dish_name)
         else
           Failure('Could not delete dish')
         end
-      rescue StandardError => e
-        Failure(e.message)
+      end
+
+      def update_session(session, dish_name)
+        session[:searched_dishes]&.delete(dish_name)
+        Success(dish_name)
       end
     end
 
@@ -193,37 +176,90 @@ module MealDecoder
     class DetectMenuText
       include Dry::Monads[:result]
 
-      def call(image_file)
-        return Failure('No image file provided') if image_file.nil?
+      def initialize(validator = Validation::ImageContract.new)
+        @validator = validator
+      end
 
-        validate_image(image_file)
-          .bind { |valid_file| detect_text(valid_file) }
+      def call(image_file)
+        validate_file(image_file)
+          .bind { |file| process_image(file) }
       end
 
       private
 
-      def validate_image(file)
-        return Failure('Invalid file format') unless valid_image?(file)
+      def validate_file(file)
+        maybe_validate_file(file)
+          .bind { |valid_file| validate_content(valid_file) }
+      end
 
+      def maybe_validate_file(file)
+        return Failure("No image file provided") unless file
         Success(file)
       end
 
-      def detect_text(file)
+      def validate_content(file)
+        validation_result = @validator.call(file: file)
+        if validation_result.success?
+          Success(file)
+        else
+          Failure(validation_result.errors.to_h)
+        end
+      end
+
+      def process_image(file)
         text = api.detect_text(file[:tempfile].path)
         Success(text)
-      rescue StandardError => e
-        Failure("Text detection error: #{e.message}")
+      rescue StandardError => error
+        Failure("Text detection error: #{error.message}")
       end
 
       def api
         @api ||= Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
       end
+    end
 
-      def valid_image?(file)
-        return false unless file.is_a?(Hash)
-        return false unless file[:tempfile] && file[:type]
+    # Validation contracts for input data
+    module Validation
+      # Constants for validation rules
+      VALID_IMAGE_TYPES = ['image/jpeg', 'image/png'].freeze
 
-        ['image/jpeg', 'image/png'].include?(file[:type])
+      # Contract for image validation
+      class ImageValidator
+        def initialize(allowed_types = VALID_IMAGE_TYPES)
+          @allowed_types = allowed_types
+        end
+
+        def valid_type?(type)
+          @allowed_types.include?(type)
+        end
+      end
+
+      # Validates dish input data
+      class DishContract < Dry::Validation::Contract
+        params do
+          required(:dish_name).filled(:string)
+        end
+
+        rule(:dish_name) do
+          key.failure('must not be empty') if value.strip.empty?
+        end
+      end
+
+      # Validates image file data
+      class ImageContract < Dry::Validation::Contract
+        option :validator, default: proc { ImageValidator.new }
+
+        params do
+          required(:file).hash do
+            required(:tempfile)
+            required(:type).filled(:string)
+          end
+        end
+
+        rule(:file) do
+          next unless value[:type]
+          key.failure('invalid image type') unless validator.valid_type?(value[:type])
+        end
       end
     end
   end

@@ -39,7 +39,7 @@ module MealDecoder
                   session: {}
                 )
 
-                if result.is_a?(Dry::Monads::Success)
+                if result.success?
                   response.status = 200
                   result.value!.to_h.to_json
                 else
@@ -56,7 +56,7 @@ module MealDecoder
             routing.get String do |dish_name|
               result = Services::FetchDish.new.call(dish_name)
 
-              if result.is_a?(Dry::Monads::Success)
+              if result.success?
                 response.status = 200
                 result.value!.to_h.to_json
               else
@@ -72,7 +72,7 @@ module MealDecoder
                 session: {}
               )
 
-              if result.is_a?(Dry::Monads::Success)
+              if result.success?
                 response.status = 200
                 { message: "Dish deleted" }.to_json
               else
@@ -86,7 +86,7 @@ module MealDecoder
           routing.post 'detect_text' do
             result = Services::DetectMenuText.new.call(routing.params['image_file'])
 
-            if result.is_a?(Dry::Monads::Success)
+            if result.success?
               response.status = 200
               {
                 status: 'ok',

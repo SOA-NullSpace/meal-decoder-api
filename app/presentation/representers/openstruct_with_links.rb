@@ -2,9 +2,22 @@
 
 module MealDecoder
   module Representer
-    # OpenStruct for deserializing json with hypermedia
+    # Extends OpenStruct to support hypermedia links in representers
     class OpenStructWithLinks < OpenStruct
-      attr_accessor :links
+      def initialize(hash = nil)
+        super
+        @links = []
+      end
+
+      def links
+        @links
+      end
+
+      protected
+
+      def links=(new_links)
+        @links = new_links
+      end
     end
   end
 end
