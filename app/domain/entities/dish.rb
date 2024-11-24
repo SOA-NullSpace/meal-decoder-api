@@ -16,7 +16,7 @@ module MealDecoder
       attribute :ingredients, Types::Array.of(Types::Strict::String)
 
       def total_calories
-        ingredients.sum { |ingredient| MealDecoder::Lib::NutritionCalculator.get_calories(ingredient) } / 2  # Divide by 2 to get more realistic portion size
+        ingredients.sum { |ingredient| MealDecoder::Lib::NutritionCalculator.get_calories(ingredient) }
       end
 
       def calorie_level
@@ -27,12 +27,14 @@ module MealDecoder
         end
       end
 
-      def calorie_class
-        case calorie_level
-        when 'Low' then 'success'
-        when 'Moderate' then 'warning'
-        else 'danger'
-        end
+      def to_h
+        {
+          id: id,
+          name: name,
+          ingredients: ingredients,
+          total_calories: total_calories,
+          calorie_level: calorie_level
+        }
       end
 
       # def get_calories(ingredient)

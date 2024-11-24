@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
-require 'dry-validation'
+require 'dry/validation'
 
 module MealDecoder
-  module Forms
-    # Form object to validate dish name
-    class NewDish < Dry::Validation::Contract
+  module Request
+    # Request validation for dish operations
+    class Dish < Dry::Validation::Contract
+      # Use params to define the shape of request parameters
       params do
         required(:dish_name).filled(:string)
       end

@@ -16,6 +16,10 @@ gem 'dry-types', '1.7'
 # Networking
 gem 'http', '5.2'
 
+# PRESENTATION LAYER
+gem 'multi_json', '1.15'
+gem 'roar', '1.2'
+
 # Web Application
 gem 'logger', '1.6'
 gem 'puma', '6.4'
@@ -48,6 +52,7 @@ end
 group :test do
   gem 'minitest', '5.25'
   gem 'minitest-rg', '5.3'
+  gem 'rack-test', '2.1'
   gem 'simplecov', '0.22.0'
   gem 'vcr', '6.3'
   gem 'webmock', '3.24'

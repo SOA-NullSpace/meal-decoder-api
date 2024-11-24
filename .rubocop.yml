@@ -23,3 +23,10 @@ Metrics/BlockLength:
   AllowedMethods:
     - namespace
     - task
+
+Naming/RescuedExceptionsVariableName:
+  Enabled: false
+
+# Ignore use of OpenStruct for representers
+Style/OpenStructUse:
+  Enabled: false

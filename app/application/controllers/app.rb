@@ -1,198 +1,204 @@
 # frozen_string_literal: true
 
-require 'roda'
-require 'slim'
-require 'rack'
-require 'dry/monads'
-
 module MealDecoder
-  # Web App
+  # Web API
   class App < Roda
-    include Dry::Monads[:result]
-
-    plugin :environments
-    plugin :render, engine: 'slim', views: 'app/presentation/views_html'
-    plugin :public, root: 'app/presentation/assets'
-    plugin :static, ['/assets']
-    plugin :flash
     plugin :all_verbs
     plugin :request_headers
-    plugin :common_logger, $stderr
     plugin :halt
+    plugin :json
     plugin :error_handler
 
-    use Rack::MethodOverride
+    # Response handler for consistent API responses
+    class ResponseHandler
+      # Encapsulates HTTP response data including status code and body
+      # Provides a consistent structure for all API responses
+      Response = Struct.new(:status, :body) do
+        def to_json_response
+          [status, body.to_json]
+        end
+      end
 
-    # Handle all errors
+      # Formats different types of values into consistent response structures
+      class SuccessFormatter
+        def self.format(value)
+          new(value).formatted_response
+        end
+
+        def initialize(value)
+          @value = value
+          @formatters = [HashFormatter, DryStructFormatter, DefaultFormatter]
+        end
+
+        def formatted_response
+          formatter = @formatters.find { |formatter| formatter.handles?(@value) }
+          formatter.format(@value)
+        end
+
+        # Handles pure Hash objects
+        class HashFormatter
+          def self.handles?(value)
+            value.instance_of?(Hash)
+          end
+
+          def self.format(value)
+            value
+          end
+        end
+
+        # Handles Dry::Struct and other objects with to_h
+        class DryStructFormatter
+          EXCLUDED_TYPES = [String].freeze
+
+          def self.handles?(value)
+            return true if value.is_a?(Dry::Struct)
+
+            has_to_h_method?(value) && !excluded_type?(value)
+          end
+
+          def self.format(value)
+            value.to_h
+          end
+
+          private_class_method def self.has_to_h_method?(value)
+            value.class.instance_methods(false).include?(:to_h)
+          end
+
+          private_class_method def self.excluded_type?(value)
+            EXCLUDED_TYPES.any? { |type| value.instance_of?(type) }
+          end
+        end
+
+        # Handles all other types
+        class DefaultFormatter
+          def self.handles?(_value)
+            true
+          end
+
+          def self.format(value)
+            { message: value.to_s }
+          end
+        end
+      end
+
+      def self.api_response(result)
+        response = handle_result(result, 200, 400)
+        response.to_json_response
+      end
+
+      def self.api_response_with_status(result, success_status: 200, error_status: 404)
+        response = handle_result(result, success_status, error_status)
+        response.to_json_response
+      end
+
+      def self.json_response(data, status = 200)
+        Response.new(status, data).to_json_response
+      end
+
+      private_class_method def self.handle_result(result, success_status, error_status)
+        if result.success?
+          handle_success(result.value!, success_status)
+        else
+          handle_error(result.failure, error_status)
+        end
+      end
+
+      private_class_method def self.handle_success(value, status)
+        Response.new(status, SuccessFormatter.format(value))
+      end
+
+      private_class_method def self.handle_error(error, status)
+        Response.new(status, { message: error })
+      end
+    end
+
     error do |error|
       puts "ERROR: #{error.inspect}"
-      puts error.backtrace
-      flash[:error] = 'An unexpected error occurred'
       response.status = 500
-      routing.redirect '/'
+      { message: error.message }.to_json
     end
 
     route do |routing|
-      response['Content-Type'] = 'text/html; charset=utf-8'
-      routing.public
+      response['Content-Type'] = 'application/json'
 
-      # GET / - Home page with search history
       routing.root do
-        # Step 1: Initialize session if needed
-        session[:searched_dishes] ||= []
-
-        begin
-          # Step 2: Load dishes from search history in database
-          dishes = session[:searched_dishes].map do |dish_name|
-            Services::FetchDish.new.call(dish_name).value_or(nil)
-          end.compact
-
-          # Step 3: Update session with valid dishes only
-          session[:searched_dishes] = dishes.map(&:name)
-
-          # Step 4: Render home page with dishes
-          view 'home', locals: {
-            title_suffix: 'Home',
-            dishes: Views::DishesList.new(dishes)
-          }
-        rescue StandardError => e
-          puts "ROOT ERROR: #{e.message}"
-          flash.now[:error] = 'Having trouble accessing the database'
-          view 'home', locals: {
-            title_suffix: 'Home',
-            dishes: Views::DishesList.new([])
-          }
-        end
+        response.status = 200
+        { message: 'MealDecoderAPI up at /api/v1' }.to_json
       end
 
-      # POST /fetch_dish - Create or retrieve dish information
-      routing.on 'fetch_dish' do
-        routing.post do
-          # Step 1: Validate form input
-          form = Forms::NewDish.new.call(routing.params)
-          if form.failure?
-            flash[:error] = form.errors.messages.first.text
-            routing.redirect '/'
+      routing.on 'api' do
+        routing.on 'v1' do
+          routing.on 'dishes' do
+            # POST /api/v1/dishes
+            routing.post do
+              request_data = parse_json_request(routing.body.read)
+              result = Services::CreateDish.new.call(
+                dish_name: request_data['dish_name'],
+                session: {}
+              )
+
+              status, body = ResponseHandler.api_response(result)
+              response.status = status
+              body
+            end
+
+            # GET /api/v1/dishes/{name}
+            routing.get String do |dish_name|
+              result = Services::FetchDish.new.call(dish_name)
+
+              status, body = ResponseHandler.api_response_with_status(result)
+              response.status = status
+              body
+            end
+
+            # DELETE /api/v1/dishes/{name}
+            routing.delete String do |dish_name|
+              result = Services::RemoveDish.new.call(
+                dish_name:,
+                session: {}
+              )
+
+              status, body = ResponseHandler.api_response_with_status(
+                result,
+                success_status: 200,
+                error_status: 404
+              )
+              response.status = status
+              body
+            end
           end
 
-          # Step 2: Process dish creation/retrieval
-          result = Services::CreateDish.new.call(
-            dish_name: form.to_h[:dish_name],
-            session:
-          )
+          # POST /api/v1/detect_text
+          routing.post 'detect_text' do
+            result = Services::DetectMenuText.new.call(routing.params['image_file'])
 
-          # Step 3: Handle the result
-          case result
-          when Success
-            # Step 4a: Redirect to dish display on success
-            flash[:success] = 'Successfully added new dish!'
-            routing.redirect "/display_dish?name=#{CGI.escape(result.value!.name)}"
-          when Failure
-            # Step 4b: Handle failure with appropriate error message
-            flash[:error] = result.failure
-            routing.redirect '/'
+            status, body = if result.success?
+                             [200, {
+                               status: 'ok',
+                               message: 'Text detected',
+                               data: result.value!
+                             }]
+                           else
+                             [400, {
+                               status: 'bad_request',
+                               message: result.failure
+                             }]
+                           end
+
+            response.status = status
+            body.to_json
           end
-        rescue StandardError => e
-          # Handle unexpected errors
-          puts "FETCH DISH ERROR: #{e.message}"
-          flash[:error] = 'An error occurred while processing your request'
-          routing.redirect '/'
         end
       end
+    end
 
-      # GET /display_dish - Show detailed dish information
-      routing.on 'display_dish' do
-        routing.get do
-          # Step 1: Extract and validate dish name
-          dish_name = CGI.unescape(routing.params['name'].to_s)
-          unless dish_name && !dish_name.empty?
-            flash[:error] = 'Could not find that dish'
-            routing.redirect '/'
-          end
+    private
 
-          # Step 2: Fetch dish from database
-          result = Services::FetchDish.new.call(dish_name)
-
-          # Step 3: Process the result
-          case result
-          when Success
-            # Step 4a: Display dish information
-            view 'dish', locals: {
-              title_suffix: result.value!.name,
-              dish: Views::Dish.new(result.value!)
-            }
-          when Failure
-            # Step 4b: Handle missing dish
-            flash[:error] = result.failure
-            routing.redirect '/'
-          end
-        rescue StandardError => e
-          puts "DISPLAY DISH ERROR: #{e.message}"
-          flash[:error] = 'Error occurred while retrieving dish information'
-          routing.redirect '/'
-        end
-      end
-
-      # POST /detect_text - Process menu image
-      routing.on 'detect_text' do
-        routing.post do
-          # Step 1: Validate uploaded file
-          upload_form = Forms::ImageFileUpload.new.call(routing.params)
-          if upload_form.failure?
-            flash[:error] = upload_form.errors.messages.first.text
-            routing.redirect '/'
-          end
-
-          # Step 2: Process image with Google Vision API
-          result = Services::DetectMenuText.new.call(upload_form.to_h[:image_file])
-
-          # Step 3: Handle the result
-          case result
-          when Success
-            # Step 4a: Display detected text
-            view 'display_text', locals: {
-              title_suffix: 'Text Detection',
-              text: Views::TextDetection.new(result.value!)
-            }
-          when Failure
-            # Step 4b: Handle text detection failure
-            flash[:error] = result.failure
-            routing.redirect '/'
-          end
-        rescue StandardError => e
-          puts "TEXT DETECTION ERROR: #{e.message}"
-          flash[:error] = 'Error occurred while processing the image'
-          routing.redirect '/'
-        end
-      end
-
-      # DELETE /dish/{name} - Remove dish from history
-      routing.on 'dish', String do |encoded_dish_name|
-        routing.delete do
-          # Step 1: Decode dish name
-          dish_name = CGI.unescape(encoded_dish_name)
-
-          # Step 2: Remove dish from history and database
-          result = Services::RemoveDish.new.call(
-            dish_name:,
-            session:
-          )
-
-          # Step 3: Handle the result
-          case result
-          when Success
-            flash[:success] = 'Dish removed from history'
-          when Failure
-            flash[:error] = result.failure
-          end
-        rescue StandardError => e
-          puts "DELETE DISH ERROR: #{e.message}"
-          flash[:error] = 'Error occurred while removing dish'
-        ensure
-          # Always redirect to home page
-          routing.redirect '/'
-        end
-      end
+    def parse_json_request(body)
+      JSON.parse(body)
+    rescue JSON::ParserError
+      response.status = 400
+      raise StandardError, 'Invalid JSON format'
     end
   end
 end
