@@ -10,6 +10,7 @@ require 'minitest/rg'
 require 'yaml'
 require 'vcr'
 require 'webmock'
+require 'rack/test'
 require 'sequel'
 
 require_relative 'helpers/vcr_helper'
@@ -18,8 +19,6 @@ require_relative '../require_app'
 require_app
 
 # Test setup module providing VCR and database management for test cases
-# Includes methods for setting up and tearing down test environments
-# This module should be included in test classes that need VCR and database support
 module MiniTestSetup
   def self.included(base)
     base.class_eval do
@@ -42,4 +41,6 @@ CONFIG = YAML.safe_load_file('config/secrets.yml')['test']
 OPENAI_API_KEY = MealDecoder::App.config.OPENAI_API_KEY
 GOOGLE_CLOUD_API_TOKEN = MealDecoder::App.config.GOOGLE_CLOUD_API_TOKEN
 
-def app = MealDecoder::App
+def app
+  MealDecoder::App
+end

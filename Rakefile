@@ -52,8 +52,15 @@ Rake::TestTask.new(:spec_unit) do |t|
   t.warning = false
 end
 
+desc 'Run acceptance tests'
+Rake::TestTask.new(:spec_acceptance) do |t|
+  t.libs << 'spec'
+  t.pattern = 'spec/tests/acceptance/*_spec.rb'
+  t.warning = false
+end
+
 # Run all specs
-task spec: %i[spec_unit spec_layers spec_services]
+task spec: %i[spec_unit spec_layers spec_services spec_acceptance]
 
 desc 'Keep rerunning tests upon changes'
 task :respec do

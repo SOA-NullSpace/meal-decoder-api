@@ -11,19 +11,18 @@ module MealDecoder
 
       property :status
       property :message
-      property :data, render_nil: true
+      property :data
+
+      STATUS_CODES = {
+        ok: 200,
+        created: 201,
+        not_found: 404,
+        bad_request: 400,
+        internal_error: 500
+      }.freeze
 
       def http_status_code
-        {
-          ok: 200,
-          created: 201,
-          forbidden: 403,
-          not_found: 404,
-          bad_request: 400,
-          conflict: 409,
-          cannot_process: 422,
-          internal_error: 500
-        }[represented.status]
+        STATUS_CODES[represented.status] || 500
       end
     end
   end

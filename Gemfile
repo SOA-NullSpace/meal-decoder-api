@@ -52,6 +52,7 @@ end
 group :test do
   gem 'minitest', '5.25'
   gem 'minitest-rg', '5.3'
+  gem 'rack-test', '2.1'
   gem 'simplecov', '0.22.0'
   gem 'vcr', '6.3'
   gem 'webmock', '3.24'

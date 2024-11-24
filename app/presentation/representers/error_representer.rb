@@ -5,13 +5,12 @@ require 'roar/json'
 
 module MealDecoder
   module Representer
-    # Represents Menu Text Detection results for API output
-    class MenuText < Roar::Decorator
+    # Represents error messages for API output
+    class Error < Roar::Decorator
       include Roar::JSON
 
       property :status
       property :message
-      property :data
     end
   end
 end

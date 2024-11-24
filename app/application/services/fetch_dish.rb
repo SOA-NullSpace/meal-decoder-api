@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'dry/monads'
-require 'dry/transaction'
 
 module MealDecoder
   module Services
@@ -11,14 +10,13 @@ module MealDecoder
 
       def call(dish_name)
         dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
-
         if dish
-          Success(dish)
+          Dry::Monads::Success(dish)
         else
-          Failure('Could not find that dish')
+          Dry::Monads::Failure("Could not find dish: #{dish_name}")
         end
-      rescue StandardError => fetch_error
-        Failure("Error fetching dish: #{fetch_error.message}")
+      rescue StandardError => e
+        Failure(e.message)
       end
     end
 
@@ -73,45 +71,35 @@ module MealDecoder
 
     # Service to create new dish from API
     class CreateDish
-      include Dry::Transaction
+      include Dry::Monads[:result]
 
-      step :validate_input
-      step :fetch_from_api
-      step :save_to_repository
-      step :add_to_history
+      def call(input)
+        if valid_input?(input)
+          begin
+            dish = APIFactory.create_mapper.find(input[:dish_name])
+            stored_dish = Repository::For.entity(dish).create(dish)
+
+            if stored_dish
+              # Add to session history if provided
+              input[:session][:searched_dishes]&.unshift(stored_dish.name)
+              input[:session][:searched_dishes]&.uniq!
+
+              Dry::Monads::Success(stored_dish)
+            else
+              Dry::Monads::Failure("Could not create dish")
+            end
+          rescue StandardError => e
+            Dry::Monads::Failure(e.message)
+          end
+        else
+          Dry::Monads::Failure('Missing or empty dish name')
+        end
+      end
 
       private
 
-      def validate_input(input)
-        puts "Validating input with dish_name: #{input[:dish_name]}"
-        data = DishData.new(input)
-        return Failure('Dish name is required') if data.name.to_s.empty?
-
-        Success(data)
-      end
-
-      def fetch_from_api(data)
-        puts "Fetching from API for dish: #{data.name}"
-        dish = APIFactory.create_mapper.find(data.name)
-        Success(data.update_dish(dish))
-      rescue StandardError => api_error
-        Failure("API Error: #{api_error.message}")
-      end
-
-      def save_to_repository(data)
-        puts "Saving to repository: #{data.dish.name}"
-        Success(data.save_to_repository)
-      rescue StandardError => db_error
-        Failure("Database Error: #{db_error.message}")
-      end
-
-      def add_to_history(data)
-        puts "Adding to history, session before: #{data.session[:searched_dishes]}"
-        data.add_to_history
-        puts "Session after update: #{data.session[:searched_dishes]}"
-        Success(data.dish)
-      rescue StandardError => session_error
-        Failure("Session Error: #{session_error.message}")
+      def valid_input?(input)
+        input[:dish_name] && !input[:dish_name].empty?
       end
     end
 
@@ -162,48 +150,65 @@ module MealDecoder
       end
     end
 
+    class ListDishes
+      include Dry::Monads[:result]
+
+      begin
+        dishes = Repository::For.klass(Entity::Dish).all
+        Dry::Monads::Success(dishes)
+      rescue StandardError => e
+        Dry::Monads::Failure("Could not list dishes: #{e.message}")
+      end
+    end
+
+    class RemoveDish
+      include Dry::Monads[:result]
+
+      def call(dish_name:, session: {})
+        dish = Repository::For.klass(Entity::Dish).find_name(dish_name)
+
+        if dish.nil?
+          Failure("Could not find dish: #{dish_name}")
+        else
+          if Repository::For.klass(Entity::Dish).delete(dish_name)
+            session[:searched_dishes]&.delete(dish_name)
+            Success(dish_name)
+          else
+            Failure('Could not delete dish')
+          end
+        end
+      rescue StandardError => e
+        Failure(e.message)
+      end
+    end
+
     # Service to process image uploads and detect text
     class DetectMenuText
       include Dry::Monads[:result]
 
       def call(image_file)
-        api = Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
-        text_result = api.detect_text(image_file[:tempfile].path)
-        Success(text_result)
-      rescue StandardError => vision_error
-        Failure("Text detection error: #{vision_error.message}")
+        return Dry::Monads::Failure("No image file provided") if image_file.nil?
+        return Dry::Monads::Failure("Invalid image format") unless valid_image?(image_file)
+
+        begin
+          text = api.detect_text(image_file[:tempfile].path)
+          Dry::Monads::Success(text)
+        rescue StandardError => e
+          Dry::Monads::Failure(e.message)
+        end
       end
-    end
-
-    # Service to remove dish from history
-    class RemoveDish
-      include Dry::Transaction
-
-      step :validate_input
-      step :remove_from_history
-      step :delete_from_database
 
       private
 
-      def validate_input(input)
-        data = DishData.new(input)
-        return Failure('Dish name is required') if data.name.to_s.empty?
-
-        Success(data)
+      def api
+        @api ||= Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
       end
 
-      def remove_from_history(data)
-        SearchHistory.new(data.session).remove(data.name)
-        Success(data)
-      rescue StandardError => history_error
-        Failure("Session Error: #{history_error.message}")
-      end
+      def valid_image?(file)
+        return false unless file.is_a?(Hash)
+        return false unless file[:tempfile] && file[:type]
 
-      def delete_from_database(data)
-        DishRepository.new.save_dish(data.name, nil)
-        Success('Dish removed successfully')
-      rescue StandardError => delete_error
-        Failure("Database Error: #{delete_error.message}")
+        ['image/jpeg', 'image/png'].include?(file[:type])
       end
     end
   end
