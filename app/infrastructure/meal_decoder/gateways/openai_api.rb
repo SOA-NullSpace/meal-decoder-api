@@ -12,7 +12,8 @@ module MealDecoder
         "I'm not sure", "I don't have information", "I'm not familiar with",
         "I don't know", 'Unable to provide ingredients', 'not a recognized dish',
         "doesn't appear to be a specific dish", "I don't have enough information",
-        "It's unclear what dish you're referring to"
+        "It's unclear what dish you're referring to",
+        "I'm sorry, but I can't provide information"
       ].freeze
 
       # Error raised when the API response indicates an unknown dish
