@@ -1,32 +1,50 @@
 ---
+# Apply latest Ruby style guide and newly introduced cops
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  Include:
+    - "Gemfile"
+    - "Rakefile"
+    - "**/*.rb"
+
 require:
   - rubocop-minitest
   - rubocop-rake
   - rubocop-sequel
 
-AllCops:
-  TargetRubyVersion: 3.3.5
-  NewCops: enable
-  SuggestExtensions: false
-  Exclude:
-    - "_snippets/*"
-  Include:
-    - "Gemfile"
-    - "Rakefile"
+# Ignore use of OpenStruct for representers
+Style/OpenStructUse:
+  Enabled: false
 
-# ignore block length in test code only
+# Ignore block length where unavoidable (e.g., frameworks using blocks)
 Metrics/BlockLength:
   Enabled: true
   Exclude:
-    - "spec/**/*"
-    - "Rakefile"
-  AllowedMethods:
-    - namespace
-    - task
+    - Rakefile
+    - app/application/controllers/**/*.rb # Roda's nested controllers require large blocks
+    - spec/**/* # Minitest's nested test structure requires large blocks
+    - Rakefile # Rake namespaces produce large blocks
+
+# See: https://www.rubydoc.info/gems/rubocop/RuboCop/Cop/Layout/MultilineMethodCallIndentation
+Layout/MultilineMethodCallIndentation:
+  Enabled: true
+  EnforcedStyle: indented
+
+Layout/HashAlignment:
+  Enabled: true
+  EnforcedHashRocketStyle: table
 
 Naming/RescuedExceptionsVariableName:
   Enabled: false
 
-# Ignore use of OpenStruct for representers
-Style/OpenStructUse:
-  Enabled: false
+Style/HashSyntax:
+  Enabled: true
+  Exclude:
+    - Rakefile
+
+Style/SymbolArray:
+  Enabled: true
+  Exclude:
+    - Rakefile
+    - app/infrastructure/database/migrations/*.rb
