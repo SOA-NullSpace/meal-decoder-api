@@ -69,10 +69,10 @@ module MealDecoder
       def parse_ingredients(ingredients_text)
         puts 'Parsing ingredients list...'
         ingredients_text.split("\n")
-                        .map(&:strip)
-                        .reject(&:empty?)
-                        .map { |ingredient| @ingredient_cleaner.clean(ingredient) }
-                        .reject(&:empty?)
+          .map(&:strip)
+          .reject(&:empty?)
+          .map { |ingredient| @ingredient_cleaner.clean(ingredient) }
+          .reject(&:empty?)
       end
 
       def create_dish_entity(dish_name, ingredients)

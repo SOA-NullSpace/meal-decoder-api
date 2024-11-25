@@ -20,7 +20,7 @@ module MealDecoder
 
     describe 'Retrieve and store dish information' do
       it 'HAPPY: should be able to save dish from OpenAI API to database' do
-        VCR.use_cassette('dish_spaghetti_carbonara', match_requests_on: [:method, :uri, :body]) do
+        VCR.use_cassette('dish_spaghetti_carbonara', match_requests_on: %i[method uri body]) do
           # Create a dish using the API
           dish_name = 'Spaghetti Carbonara'
           api_dish = Mappers::DishMapper
@@ -43,7 +43,7 @@ module MealDecoder
       end
 
       it 'HAPPY: should be able to update existing dish' do
-        VCR.use_cassette('dish_classic_pizza', match_requests_on: [:method, :uri, :body]) do
+        VCR.use_cassette('dish_classic_pizza', match_requests_on: %i[method uri body]) do
           # First create a dish
           dish_name = 'Classic Pizza'
           api = Gateways::OpenAIAPI.new(OPENAI_API_KEY)
@@ -54,7 +54,7 @@ module MealDecoder
           ).create(mapper.find(dish_name))
 
           # Update the same dish with different cassette
-          VCR.use_cassette('dish_classic_pizza_update', match_requests_on: [:method, :uri, :body]) do
+          VCR.use_cassette('dish_classic_pizza_update', match_requests_on: %i[method uri body]) do
             updated_stored = Repository::For.entity(
               mapper.find(dish_name)
             ).create(mapper.find(dish_name))
@@ -64,7 +64,7 @@ module MealDecoder
             _(updated_stored.name).must_equal(first_stored.name)
 
             # Instead of comparing counts, verify that core ingredients are present
-            core_ingredients = ['Pizza', 'Tomato', 'Mozzarella', 'Cheese', 'Dough'].map(&:downcase)
+            core_ingredients = %w[Pizza Tomato Mozzarella Cheese Dough].map(&:downcase)
             has_core_ingredients = updated_stored.ingredients.any? do |ingredient|
               core_ingredients.any? { |core| ingredient.downcase.include?(core) }
             end
@@ -78,7 +78,7 @@ module MealDecoder
 
       it 'SAD: should gracefully handle invalid dish names' do
         # Test name longer than database limit
-        too_long_name = 'x' * 101  # Exceeds 100 character limit
+        too_long_name = 'x' * 101 # Exceeds 100 character limit
 
         # First test: name too long
         _(proc do
@@ -88,7 +88,7 @@ module MealDecoder
         end).must_raise Sequel::ValidationFailed
 
         # Second test: invalid characters in name
-        invalid_name = 'Pizza!!!123'  # Contains invalid characters
+        invalid_name = 'Pizza!!!123' # Contains invalid characters
 
         _(proc do
           Database::DishOrm.create(

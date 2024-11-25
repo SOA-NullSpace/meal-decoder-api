@@ -7,6 +7,21 @@ require 'base64'
 
 module MealDecoder
   module Gateways
+    # Value object for encapsulating text annotation data
+    class TextAnnotation
+      def self.from_hash(annotation_hash)
+        new(annotation_hash.fetch('description', '')) if annotation_hash
+      end
+
+      def initialize(text)
+        @text = text
+      end
+
+      def to_s
+        @text.strip
+      end
+    end
+
     # The GoogleVisionAPI class provides methods to interact with the Google Vision API for image analysis.
     class GoogleVisionAPI
       BASE_URL = 'https://vision.googleapis.com/v1/images:annotate'
@@ -62,8 +77,15 @@ module MealDecoder
         raise "API request failed with status code: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
 
         json_response = JSON.parse(response.body)
-        text_annotations = json_response.dig('responses', 0, 'textAnnotations')
-        text_annotations&.first&.fetch('description', '')&.strip || ''
+        annotations = json_response.dig('responses', 0, 'textAnnotations') || []
+        extract_text_from_annotations(annotations)
+      end
+
+      # :reek:UtilityFunction
+      def extract_text_from_annotations(annotations)
+        return '' if annotations.empty?
+
+        TextAnnotation.from_hash(annotations.first).to_s
       end
     end
   end

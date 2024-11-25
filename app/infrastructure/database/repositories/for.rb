@@ -9,8 +9,8 @@ module MealDecoder
     # Finds the right repository for an entity object or class
     module For
       ENTITY_REPOSITORY = {
-        MealDecoder::Entity::Dish => Dishes,
-        MealDecoder::Entity::Ingredient => Ingredients,
+        MealDecoder::Entity::Dish           => Dishes,
+        MealDecoder::Entity::Ingredient     => Ingredients,
         MealDecoder::Entity::DishIngredient => Dishes
       }.freeze
 

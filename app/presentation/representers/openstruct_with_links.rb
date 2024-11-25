@@ -9,15 +9,11 @@ module MealDecoder
         @links = []
       end
 
-      def links
-        @links
-      end
+      attr_reader :links
 
       protected
 
-      def links=(new_links)
-        @links = new_links
-      end
+      attr_writer :links
     end
   end
 end

@@ -19,7 +19,7 @@ module MealDecoder
       end
 
       def message
-        return "Could not find any dishes" if @dishes.empty?
+        return 'Could not find any dishes' if @dishes.empty?
 
         "Found #{@dishes.length} dishes"
       end

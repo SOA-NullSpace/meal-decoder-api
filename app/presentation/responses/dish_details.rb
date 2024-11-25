@@ -19,9 +19,9 @@ module MealDecoder
       end
 
       def message
-        return "Could not find dish" unless @dish
+        return 'Could not find dish' unless @dish
 
-        "Found dish details"
+        'Found dish details'
       end
     end
   end

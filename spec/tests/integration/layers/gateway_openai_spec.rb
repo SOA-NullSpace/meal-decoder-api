@@ -59,10 +59,13 @@ describe 'Integration Tests of OpenAI API Gateway' do
           }]
         }.to_json
 
-        @api.set_test_response(unknown_dish_response)
+        api = MealDecoder::Gateways::OpenAIAPI.with_mock_response(
+          OPENAI_API_KEY,
+          unknown_dish_response
+        )
 
         _(proc do
-          @api.fetch_ingredients('Xylophone Surprise with Unicorn Tears')
+          api.fetch_ingredients('Xylophone Surprise with Unicorn Tears')
         end).must_raise MealDecoder::Gateways::OpenAIAPI::UnknownDishError
       end
     end
@@ -87,10 +90,13 @@ describe 'Integration Tests of OpenAI API Gateway' do
           }
         }.to_json
 
-        @api.set_test_response(error_response)
+        api = MealDecoder::Gateways::OpenAIAPI.with_mock_response(
+          OPENAI_API_KEY,
+          error_response
+        )
 
         error = _(proc do
-          @api.fetch_ingredients('Test Dish')
+          api.fetch_ingredients('Test Dish')
         end).must_raise StandardError
 
         _(error.message).must_include 'API error'

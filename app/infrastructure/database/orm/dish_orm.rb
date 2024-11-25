@@ -14,7 +14,7 @@ module MealDecoder
         validates_max_length 100, :name
         # Allow letters, numbers, and spaces in dish names
         validates_format(/\A[\p{L}\p{N}\s]+\z/u, :name,
-                       message: 'must contain only letters, numbers, and spaces')
+                         message: 'must contain only letters, numbers, and spaces')
       end
 
       many_to_many :ingredients,

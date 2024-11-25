@@ -31,8 +31,8 @@ module MealDecoder
         end
 
         def formatted_response
-          formatter = @formatters.find { |formatter| formatter.handles?(@value) }
-          formatter.format(@value)
+          current_formatter = @formatters.find { |fmt| fmt.handles?(@value) }
+          current_formatter.format(@value)
         end
 
         # Handles pure Hash objects
@@ -52,19 +52,16 @@ module MealDecoder
 
           def self.handles?(value)
             return true if value.is_a?(Dry::Struct)
+            return false if excluded_type?(value)
 
-            has_to_h_method?(value) && !excluded_type?(value)
+            value.class.instance_methods(false).include?(:to_h)
           end
 
           def self.format(value)
             value.to_h
           end
 
-          private_class_method def self.has_to_h_method?(value)
-            value.class.instance_methods(false).include?(:to_h)
-          end
-
-          private_class_method def self.excluded_type?(value)
+          def self.excluded_type?(value)
             EXCLUDED_TYPES.any? { |type| value.instance_of?(type) }
           end
         end

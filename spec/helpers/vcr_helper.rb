@@ -15,13 +15,13 @@ module VcrHelper
   module VcrConfig
     def self.default_cassette_options
       {
-        match_requests_on: [:method, :uri, :body]
+        match_requests_on: %i[method uri body]
       }
     end
 
     def self.sensitive_data_filters(config)
       {
-        'OPENAI_API_KEY' => config.OPENAI_API_KEY,
+        'OPENAI_API_KEY'         => config.OPENAI_API_KEY,
         'GOOGLE_CLOUD_API_TOKEN' => config.GOOGLE_CLOUD_API_TOKEN
       }
     end
@@ -56,6 +56,6 @@ module VcrHelper
   end
 
   private_class_method def self.apply_default_options(configuration)
-    configuration.default_cassette_options = VcrConfig::default_cassette_options
+    configuration.default_cassette_options = VcrConfig.default_cassette_options
   end
 end
