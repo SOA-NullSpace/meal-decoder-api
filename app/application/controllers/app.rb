@@ -52,19 +52,16 @@ module MealDecoder
 
           def self.handles?(value)
             return true if value.is_a?(Dry::Struct)
+            return false if excluded_type?(value)
 
-            has_to_h_method?(value) && !excluded_type?(value)
+            value.class.instance_methods(false).include?(:to_h)
           end
 
           def self.format(value)
             value.to_h
           end
 
-          private_class_method def self.to_h_method?(value)
-            value.class.instance_methods(false).include?(:to_h)
-          end
-
-          private_class_method def self.excluded_type?(value)
+          def self.excluded_type?(value)
             EXCLUDED_TYPES.any? { |type| value.instance_of?(type) }
           end
         end

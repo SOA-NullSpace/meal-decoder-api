@@ -5,24 +5,6 @@ require 'json'
 
 module MealDecoder
   module Gateways
-    # Factory for creating response providers
-    class ResponseProviderFactory
-      def self.create(api_client)
-        ResponseProvider.new(api_client)
-      end
-    end
-
-    # Handles OpenAI API response retrieval and validation
-    class ResponseProvider
-      def initialize(api_client)
-        @api_client = api_client
-      end
-
-      def fetch_response(dish_name)
-        @api_client.send_request(dish_name)
-      end
-    end
-
     # The OpenAIAPI class is responsible for interfacing with the OpenAI API to fetch ingredients for dishes.
     class OpenAIAPI
       API_URL = 'https://api.openai.com/v1/chat/completions'
@@ -44,25 +26,46 @@ module MealDecoder
       # Initializes the OpenAIAPI with an API key.
       def initialize(api_key)
         @api_key = api_key
-        @response_provider = ResponseProviderFactory.create(self)
+        @mock_response = nil
       end
 
       # Fetches ingredients for a given dish name using the OpenAI API or a test response if set.
       def fetch_ingredients(dish_name)
-        response = @response_provider.fetch_response(dish_name)
+        response = @mock_response || send_request(dish_name)
         ingredients = extract_ingredients_from_response(response)
         validate_ingredients(ingredients, dish_name)
         ingredients
       end
 
-      def send_request(dish_name)
-        HTTP.headers(
-          'Content-Type'  => 'application/json',
-          'Authorization' => "Bearer #{@api_key}"
-        ).post(API_URL, json: request_body(dish_name))
+      # For testing purposes only
+      def self.with_mock_response(api_key, mock_response)
+        new(api_key).tap do |api|
+          api.instance_variable_set(:@mock_response, mock_response)
+        end
       end
 
       private
+
+      def send_request(dish_name)
+        response = HTTP.headers(
+          'Content-Type'  => 'application/json',
+          'Authorization' => "Bearer #{@api_key}"
+        ).post(API_URL, json: request_body(dish_name))
+
+        response.body.to_s
+      rescue HTTP::Error => error
+        handle_http_error(error)
+      end
+
+      def handle_http_error(error)
+        error_text = error.message
+        case error_text
+        when /401/, /unauthorized/i
+          raise "Incorrect API key provided: #{@api_key}"
+        else
+          raise "HTTP Error: #{error_text}"
+        end
+      end
 
       def request_body(dish_name)
         {
@@ -93,7 +96,9 @@ module MealDecoder
 
       # :reek:UtilityFunction
       def parse_response_body(response)
-        response.is_a?(String) ? JSON.parse(response) : JSON.parse(response.body.to_s)
+        JSON.parse(response)
+      rescue JSON::ParserError
+        raise "Invalid JSON response: #{response}"
       end
 
       def handle_response_errors(error)
@@ -104,8 +109,8 @@ module MealDecoder
 
       def raise_appropriate_error(message)
         case message
-        when /not found/ then raise 'Dish not found.'
-        when /Invalid API key/ then raise 'Invalid API key provided.'
+        when /not found/i then raise 'Dish not found.'
+        when /incorrect.+key/i then raise "Incorrect API key provided: #{@api_key}"
         else raise "API error: #{message}"
         end
       end
