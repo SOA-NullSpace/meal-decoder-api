@@ -27,8 +27,10 @@ describe 'API acceptance tests' do
 
       VCR.use_cassette('dish_carbonara') do
         post '/api/v1/dishes', dish_data
-        _last_response_status = last_response.status # Capture status for debugging
-        puts "Response Status: #{_last_response_status}"
+
+        # Capture status for debugging without using underscore prefix
+        response_status = last_response.status
+        puts "Response Status: #{response_status}"
         puts "Response Body: #{last_response.body}"
 
         _(last_response.status).must_equal 200
@@ -73,7 +75,7 @@ describe 'API acceptance tests' do
       )
 
       VCR.use_cassette('menu_text_detection') do
-        post '/api/v1/detect_text', { image_file: image_file }
+        post '/api/v1/detect_text', { image_file: }
       end
 
       _(last_response.status).must_equal 200

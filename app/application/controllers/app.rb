@@ -31,8 +31,8 @@ module MealDecoder
         end
 
         def formatted_response
-          formatter = @formatters.find { |formatter| formatter.handles?(@value) }
-          formatter.format(@value)
+          current_formatter = @formatters.find { |fmt| fmt.handles?(@value) }
+          current_formatter.format(@value)
         end
 
         # Handles pure Hash objects

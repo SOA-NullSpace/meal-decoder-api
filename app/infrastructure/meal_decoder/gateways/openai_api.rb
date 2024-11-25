@@ -5,6 +5,24 @@ require 'json'
 
 module MealDecoder
   module Gateways
+    # Factory for creating response providers
+    class ResponseProviderFactory
+      def self.create(api_client)
+        ResponseProvider.new(api_client)
+      end
+    end
+
+    # Handles OpenAI API response retrieval and validation
+    class ResponseProvider
+      def initialize(api_client)
+        @api_client = api_client
+      end
+
+      def fetch_response(dish_name)
+        @api_client.send_request(dish_name)
+      end
+    end
+
     # The OpenAIAPI class is responsible for interfacing with the OpenAI API to fetch ingredients for dishes.
     class OpenAIAPI
       API_URL = 'https://api.openai.com/v1/chat/completions'
@@ -16,30 +34,26 @@ module MealDecoder
         "I'm sorry, but I can't provide information"
       ].freeze
 
+      SYSTEM_PROMPT = 'You are a helpful assistant that lists ingredients. Provide only ' \
+                      'the ingredient names, one per line. Do not include measurements, ' \
+                      'numbers, or any other text. If you do not know the dish, say so directly.'
+
       # Error raised when the API response indicates an unknown dish
       class UnknownDishError < StandardError; end
 
       # Initializes the OpenAIAPI with an API key.
       def initialize(api_key)
         @api_key = api_key
-        @test_response = nil
+        @response_provider = ResponseProviderFactory.create(self)
       end
 
       # Fetches ingredients for a given dish name using the OpenAI API or a test response if set.
       def fetch_ingredients(dish_name)
-        response = @test_response || send_request(dish_name)
+        response = @response_provider.fetch_response(dish_name)
         ingredients = extract_ingredients_from_response(response)
         validate_ingredients(ingredients, dish_name)
         ingredients
       end
-
-      # Sets a test response to be used instead of sending a real API request.
-      # This method is intended for testing purposes only.
-      def set_test_response(response)
-        @test_response = response
-      end
-
-      private
 
       def send_request(dish_name)
         HTTP.headers(
@@ -48,21 +62,27 @@ module MealDecoder
         ).post(API_URL, json: request_body(dish_name))
       end
 
+      private
+
       def request_body(dish_name)
         {
           model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that lists ingredients. Provide only the ingredient names, one per line. Do not include measurements, numbers, or any other text. If you do not know the dish, say so directly.'
-            },
-            {
-              role: 'user',
-              content: "List the ingredients in #{dish_name}, providing only the ingredient names:"
-            }
-          ],
+          messages: build_messages(dish_name),
           temperature: 0.7
         }
+      end
+
+      def build_messages(dish_name)
+        [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: "List the ingredients in #{dish_name}, providing only the ingredient names:"
+          }
+        ]
       end
 
       def extract_ingredients_from_response(response)
