@@ -18,7 +18,7 @@ module MealDecoder
         return nil unless entity
 
         db_record = Database::IngredientOrm.find_or_create(name: entity.name,
-        calories_per_100g: entity.calories_per_100g || 0.0)
+                                                           calories_per_100g: entity.calories_per_100g || 0.0)
         rebuild_entity(db_record)
       end
 

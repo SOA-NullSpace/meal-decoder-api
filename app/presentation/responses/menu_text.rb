@@ -19,9 +19,9 @@ module MealDecoder
       end
 
       def message
-        return "No text detected in image" if @text_result.empty?
+        return 'No text detected in image' if @text_result.empty?
 
-        "Successfully detected menu text"
+        'Successfully detected menu text'
       end
     end
   end

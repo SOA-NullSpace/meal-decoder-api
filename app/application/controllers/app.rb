@@ -60,7 +60,7 @@ module MealDecoder
             value.to_h
           end
 
-          private_class_method def self.has_to_h_method?(value)
+          private_class_method def self.to_h_method?(value)
             value.class.instance_methods(false).include?(:to_h)
           end
 

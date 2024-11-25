@@ -47,6 +47,7 @@ module MealDecoder
 
       def value
         return nil unless success?
+
         @result.value!
       end
 
@@ -92,7 +93,7 @@ module MealDecoder
         if dish
           Success(dish)
         else
-          Failure("Could not find that dish")
+          Failure('Could not find that dish')
         end
       rescue StandardError => error
         Failure("Database error: #{error.message}")
@@ -104,7 +105,7 @@ module MealDecoder
       include Dry::Monads[:result]
 
       def initialize(validator: Validation::DishContract.new,
-                    result_handler: ResultHandler.new)
+                     result_handler: ResultHandler.new)
         @validator = validator
         @result_handler = result_handler
       end
@@ -148,9 +149,9 @@ module MealDecoder
       end
 
       def call(dish_name:, session: {})
-        remove_dish(dish_name).bind { |deleted_name|
+        remove_dish(dish_name).bind do |deleted_name|
           update_session(session, deleted_name)
-        }
+        end
       end
 
       private
@@ -193,7 +194,8 @@ module MealDecoder
       end
 
       def maybe_validate_file(file)
-        return Failure("No image file provided") unless file
+        return Failure('No image file provided') unless file
+
         Success(file)
       end
 
@@ -258,6 +260,7 @@ module MealDecoder
 
         rule(:file) do
           next unless value[:type]
+
           key.failure('invalid image type') unless validator.valid_type?(value[:type])
         end
       end

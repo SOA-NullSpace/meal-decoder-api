@@ -43,7 +43,7 @@ module MealDecoder
 
       def send_request(dish_name)
         HTTP.headers(
-          'Content-Type' => 'application/json',
+          'Content-Type'  => 'application/json',
           'Authorization' => "Bearer #{@api_key}"
         ).post(API_URL, json: request_body(dish_name))
       end
