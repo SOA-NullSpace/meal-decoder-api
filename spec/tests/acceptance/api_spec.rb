@@ -28,11 +28,6 @@ describe 'API acceptance tests' do
       VCR.use_cassette('dish_carbonara') do
         post '/api/v1/dishes', dish_data
 
-        # Capture status for debugging without using underscore prefix
-        response_status = last_response.status
-        puts "Response Status: #{response_status}"
-        puts "Response Body: #{last_response.body}"
-
         _(last_response.status).must_equal 200
 
         result = JSON.parse(last_response.body)
@@ -59,7 +54,7 @@ describe 'API acceptance tests' do
       _(result['name']).must_equal 'Chicken Fried Rice'
     end
 
-    it 'HAPPY: should delete a dish' do
+    it 'HAPPY: should delete a dish by ID' do
       # First, create a test dish
       dish = MealDecoder::Entity::Dish.new(
         id: nil,
@@ -68,7 +63,7 @@ describe 'API acceptance tests' do
       )
       stored_dish = MealDecoder::Repository::For.entity(dish).create(dish)
 
-      delete "/api/v1/dishes/#{CGI.escape(stored_dish.name)}"
+      delete "/api/v1/dishes/#{stored_dish.id}"
       _(last_response.status).must_equal 200
 
       # Verify the dish is gone
@@ -76,9 +71,25 @@ describe 'API acceptance tests' do
       _(last_response.status).must_equal 404
     end
 
-    it 'SAD: should return error for non-existent dish' do
+    it 'SAD: should return error for non-existent dish ID' do
+      delete '/api/v1/dishes/999999'
+      _(last_response.status).must_equal 404
+
+      result = JSON.parse(last_response.body)
+      _(result['message']).must_include 'Could not find dish with ID'
+    end
+
+    it 'SAD: should return error for non-existent dish name' do
       get '/api/v1/dishes?q=nonexistentdish'
       _(last_response.status).must_equal 404
+    end
+
+    it 'SAD: should return error for missing dish name parameter' do
+      get '/api/v1/dishes'
+      _(last_response.status).must_equal 200
+
+      result = JSON.parse(last_response.body)
+      _(result['message']).must_equal 'Missing dish name parameter'
     end
   end
 

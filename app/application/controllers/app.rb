@@ -151,10 +151,10 @@ module MealDecoder
               body
             end
 
-            # DELETE /api/v1/dishes/{name}
-            routing.delete String do |dish_name|
+            # DELETE /api/v1/dishes/{id}
+            routing.delete Integer do |id|
               result = Services::RemoveDish.new.call(
-                dish_name:,
+                dish_id: id,
                 session: {}
               )
 
