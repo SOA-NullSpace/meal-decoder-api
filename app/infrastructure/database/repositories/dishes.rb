@@ -18,6 +18,18 @@ module MealDecoder
         rebuild_entity(db_dish)
       end
 
+      def self.find_id(id)
+        db_record = Database::DishOrm.first(id:)
+        rebuild_entity(db_record)
+      end
+
+      def self.delete_by_id(id)
+        remove_dish_by_id(id)
+      rescue StandardError => error
+        log_delete_error(error)
+        false
+      end
+
       # Retrieves all dishes from the database
       def self.all
         Database::DishOrm.all.map { |db_dish| rebuild_entity(db_dish) }
@@ -75,6 +87,13 @@ module MealDecoder
 
         def remove_dish_by_name(name)
           db_dish = find_dish_by_name(name)
+          return false unless db_dish
+
+          perform_dish_deletion(db_dish)
+        end
+
+        def remove_dish_by_id(id)
+          db_dish = Database::DishOrm.first(id:)
           return false unless db_dish
 
           perform_dish_deletion(db_dish)

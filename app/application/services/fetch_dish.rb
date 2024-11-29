@@ -4,7 +4,7 @@ require 'dry/validation'
 
 module MealDecoder
   module Services
-    # Service to fetch dish details
+    # Service to fetch dish details by name
     class FetchDish
       include Dry::Monads[:result]
 
@@ -14,6 +14,26 @@ module MealDecoder
           Success(dish)
         else
           Failure('Could not find that dish')
+        end
+      rescue StandardError => error
+        Failure("Database error: #{error.message}")
+      end
+    end
+
+    # Service to fetch dish details by ID
+    class FetchDishById
+      include Dry::Monads[:result]
+
+      def initialize
+        @repository = Repository::For.klass(Entity::Dish)
+      end
+
+      def call(id)
+        dish = @repository.find_id(id)
+        if dish
+          Success(dish)
+        else
+          Failure("Could not find dish with ID: #{id}")
         end
       rescue StandardError => error
         Failure("Database error: #{error.message}")

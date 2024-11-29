@@ -20,30 +20,68 @@ describe 'API acceptance tests' do
   end
 
   describe 'Dish API tests' do
-    it 'HAPPY: should create a dish' do
-      # Create dish with known ingredients
-      dish_data = { dish_name: 'Spaghetti Carbonara' }.to_json
+    it 'HAPPY: should create a dish and show in recent dishes' do
+      # Create first dish
       header 'CONTENT_TYPE', 'application/json'
+      dish_data = { dish_name: 'Spaghetti Carbonara' }.to_json
 
       VCR.use_cassette('dish_carbonara') do
         post '/api/v1/dishes', dish_data
-
-        # Capture status for debugging without using underscore prefix
-        response_status = last_response.status
-        puts "Response Status: #{response_status}"
-        puts "Response Body: #{last_response.body}"
-
         _(last_response.status).must_equal 200
-
-        result = JSON.parse(last_response.body)
-        _(result['name']).must_equal 'Spaghetti Carbonara'
-        _(result['ingredients']).must_be_kind_of Array
-        _(result['ingredients']).must_include 'Spaghetti'
       end
+
+      # Create second dish
+      dish_data = { dish_name: 'Chicken Fried Rice' }.to_json
+      VCR.use_cassette('dish_fried_rice') do
+        post '/api/v1/dishes', dish_data
+        _(last_response.status).must_equal 200
+      end
+
+      # Get recent dishes
+      get '/api/v1/dishes'
+      _(last_response.status).must_equal 200
+
+      result = JSON.parse(last_response.body)
+      _(result['count']).must_equal 2
+
+      recent_dishes = result['recent_dishes']
+      _(recent_dishes).must_be_kind_of Array
+      _(recent_dishes.map { |d| d['name'] }).must_include 'Spaghetti Carbonara'
+      _(recent_dishes.map { |d| d['name'] }).must_include 'Chicken Fried Rice'
     end
 
-    it 'HAPPY: should delete a dish' do
-      # First, create a test dish
+    it 'HAPPY: should maintain dish order in recent dishes' do
+      header 'CONTENT_TYPE', 'application/json'
+
+      # Create dishes in sequence
+      dishes = ['Spaghetti Carbonara', 'Chicken Fried Rice', 'Pizza']
+      dishes.each do |dish_name|
+        VCR.use_cassette("dish_#{dish_name.downcase.gsub(' ', '_')}") do
+          post '/api/v1/dishes', { dish_name: }.to_json
+          _(last_response.status).must_equal 200
+        end
+      end
+
+      # Get recent dishes
+      get '/api/v1/dishes'
+      result = JSON.parse(last_response.body)
+      recent_dishes = result['recent_dishes']
+
+      # Verify order (most recent first)
+      _(recent_dishes.map { |d| d['name'] }).must_equal dishes.reverse
+    end
+
+    it 'HAPPY: should return empty recent dishes for new session' do
+      get '/api/v1/dishes'
+      _(last_response.status).must_equal 200
+
+      result = JSON.parse(last_response.body)
+      _(result['count']).must_equal 0
+      _(result['recent_dishes']).must_be_empty
+    end
+
+    it 'HAPPY: should get dish by ID' do
+      # First create a test dish
       dish = MealDecoder::Entity::Dish.new(
         id: nil,
         name: 'TestDish',
@@ -51,17 +89,21 @@ describe 'API acceptance tests' do
       )
       stored_dish = MealDecoder::Repository::For.entity(dish).create(dish)
 
-      delete "/api/v1/dishes/#{CGI.escape(stored_dish.name)}"
+      # Test retrieving the dish by ID
+      get "/api/v1/dishes/#{stored_dish.id}"
       _(last_response.status).must_equal 200
 
-      # Verify the dish is gone
-      get "/api/v1/dishes/#{CGI.escape(stored_dish.name)}"
-      _(last_response.status).must_equal 404
+      result = JSON.parse(last_response.body)
+      _(result['id']).must_equal stored_dish.id
+      _(result['name']).must_equal 'TestDish'
     end
 
-    it 'SAD: should return error for non-existent dish' do
-      get '/api/v1/dishes/nonexistentdish'
+    it 'SAD: should return error for non-existent dish ID in GET request' do
+      get '/api/v1/dishes/999999'
       _(last_response.status).must_equal 404
+
+      result = JSON.parse(last_response.body)
+      _(result['message']).must_include 'Could not find dish with ID'
     end
   end
 

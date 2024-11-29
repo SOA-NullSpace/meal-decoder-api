@@ -8,6 +8,11 @@ module MealDecoder
     plugin :halt
     plugin :json
     plugin :error_handler
+    plugin :request_headers
+    plugin :cookies
+    plugin :sessions,
+           key: 'meal_decoder.session',
+           secret: config.SESSION_SECRET
 
     # Response handler for consistent API responses
     class ResponseHandler
@@ -126,6 +131,41 @@ module MealDecoder
       routing.on 'api' do
         routing.on 'v1' do
           routing.on 'dishes' do
+            # GET /api/v1/dishes/{id} - Get dish by ID
+            routing.get Integer do |id|
+              result = Services::FetchDishById.new.call(id)
+              status, body = ResponseHandler.api_response_with_status(result)
+              response.status = status
+              body
+            end
+
+            # GET /api/v1/dishes - Get recent dishes or search by name
+            routing.get do
+              # If q parameter is present, perform dish search
+              if routing.params['q']
+                dish_name = routing.params['q']
+                result = Services::FetchDish.new.call(dish_name)
+                status, body = ResponseHandler.api_response_with_status(result)
+                response.status = status
+                return body
+              end
+
+              # Otherwise return recent dishes
+              response.status = 200
+              dish_names = session[:searched_dishes] || []
+              recent_dishes = []
+
+              dish_names.each do |name|
+                dish = Services::FetchDish.new.call(name)
+                recent_dishes << dish.value! if dish.success?
+              end
+
+              {
+                count: recent_dishes.length,
+                recent_dishes: recent_dishes.map(&:to_h)
+              }.to_json
+            end
+
             # POST /api/v1/dishes
             routing.post do
               request_data = parse_json_request(routing.body.read)
@@ -134,26 +174,29 @@ module MealDecoder
                 session: {}
               )
 
+              if result.success?
+                # Initialize session array if needed
+                session[:searched_dishes] ||= []
+
+                # Add to recent dishes
+                dish_name = result.value!.name
+                session[:searched_dishes].delete(dish_name) # Remove if exists
+                session[:searched_dishes].unshift(dish_name) # Add to front
+              end
+
               status, body = ResponseHandler.api_response(result)
               response.status = status
               body
             end
 
-            # GET /api/v1/dishes/{name}
-            routing.get String do |dish_name|
-              result = Services::FetchDish.new.call(dish_name)
-
-              status, body = ResponseHandler.api_response_with_status(result)
-              response.status = status
-              body
-            end
-
-            # DELETE /api/v1/dishes/{name}
-            routing.delete String do |dish_name|
+            # DELETE /api/v1/dishes/{id}
+            routing.delete Integer do |id|
               result = Services::RemoveDish.new.call(
-                dish_name:,
-                session: {}
+                dish_id: id,
+                session:
               )
+
+              session[:searched_dishes]&.delete(result.value!.name) if result.success? && result.value!.name
 
               status, body = ResponseHandler.api_response_with_status(
                 result,
