@@ -21,7 +21,6 @@ jobs:
       BUNDLE_WITHOUT: production
       RACK_ENV: test
       DATABASE_URL: sqlite://db/local/test.db
-      VCR_MODE: replay
 
     steps:
       - uses: actions/checkout@v4
@@ -41,28 +40,29 @@ jobs:
           mkdir -p config
           cat > config/secrets.yml << EOL
           ---
+          development:
+            DB_FILENAME: db/local/dev.db
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
           test:
             DB_FILENAME: db/local/test.db
             OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
             GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
             SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+          production:
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
           EOL
 
-      - name: Create cassettes directory
-        run: mkdir -p spec/fixtures/cassettes
-
       - name: Setup test database
-        env:
-          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-          GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-          SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
         run: bundle exec rake db:migrate
 
-      - name: Run all specs
-        env:
-          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-          GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-          SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+      - name: Copy VCR cassettes from fixtures
         run: |
           mkdir -p spec/fixtures/cassettes
-          bundle exec rake spec
+          cp spec/fixtures/*.yml spec/fixtures/cassettes/ || true
+
+      - name: Run all specs
+        run: bundle exec rake spec
