@@ -40,29 +40,25 @@ jobs:
           mkdir -p config
           cat > config/secrets.yml << EOL
           ---
-          development:
-            DB_FILENAME: db/local/dev.db
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
           test:
             DB_FILENAME: db/local/test.db
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
-          production:
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+            OPENAI_API_KEY: |
+              ${{ secrets.OPENAI_API_KEY }}
+            GOOGLE_CLOUD_API_TOKEN: |
+              ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
+            SESSION_SECRET: |
+              ${{ secrets.SESSION_SECRET }}
           EOL
 
       - name: Setup test database
         run: bundle exec rake db:migrate
 
-      - name: Copy VCR cassettes from fixtures
+      - name: Run specs
+        env:
+          SPEC_OPTS: --backtrace
         run: |
-          mkdir -p spec/fixtures/cassettes
-          cp spec/fixtures/*.yml spec/fixtures/cassettes/ || true
-
-      - name: Run all specs
-        run: bundle exec rake spec
+          if [ "${{ matrix.os }}" = "macos" ]; then
+            bundle exec rake spec_unit spec_acceptance
+          else
+            bundle exec rake spec
+          fi
