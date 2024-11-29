@@ -21,6 +21,7 @@ jobs:
       BUNDLE_WITHOUT: production
       RACK_ENV: test
       DATABASE_URL: sqlite://db/local/test.db
+      VCR_MODE: replay
 
     steps:
       - uses: actions/checkout@v4
@@ -38,23 +39,30 @@ jobs:
       - name: Create secrets.yml
         run: |
           mkdir -p config
-          echo "---" > config/secrets.yml
-          echo "test:" >> config/secrets.yml
-          echo "  DB_FILENAME: db/local/test.db" >> config/secrets.yml
-          echo "  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}" >> config/secrets.yml
-          echo "  GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}" >> config/secrets.yml
-          echo "  SESSION_SECRET: ${{ secrets.SESSION_SECRET }}" >> config/secrets.yml
+          cat > config/secrets.yml << EOL
+          ---
+          test:
+            DB_FILENAME: db/local/test.db
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+          EOL
+
+      - name: Create cassettes directory
+        run: mkdir -p spec/fixtures/cassettes
 
       - name: Setup test database
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+          SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
         run: bundle exec rake db:migrate
 
       - name: Run all specs
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-        run: bundle exec rake spec
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+          SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+        run: |
+          mkdir -p spec/fixtures/cassettes
+          bundle exec rake spec
