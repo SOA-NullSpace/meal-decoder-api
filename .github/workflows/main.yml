@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu]
+        os: [ubuntu, macos]
         ruby: ["3.3.5"]
 
     runs-on: ${{ matrix.os }}-latest
@@ -34,6 +34,16 @@ jobs:
         run: |
           mkdir -p db/local
           touch db/local/test.db
+
+      - name: Create secrets.yml
+        run: |
+          mkdir -p config
+          echo "---" > config/secrets.yml
+          echo "test:" >> config/secrets.yml
+          echo "  DB_FILENAME: db/local/test.db" >> config/secrets.yml
+          echo "  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}" >> config/secrets.yml
+          echo "  GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}" >> config/secrets.yml
+          echo "  SESSION_SECRET: ${{ secrets.SESSION_SECRET }}" >> config/secrets.yml
 
       - name: Setup test database
         env:
