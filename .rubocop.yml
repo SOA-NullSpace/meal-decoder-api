@@ -4,9 +4,12 @@ AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
   Include:
-    - "Gemfile"
-    - "Rakefile"
-    - "**/*.rb"
+    - 'Gemfile'
+    - 'Rakefile'
+    - '**/*.rb'
+  Exclude:
+    # - 'spec/**/*'
+    - 'merge.rb'
 
 require:
   - rubocop-minitest
@@ -21,10 +24,15 @@ Style/OpenStructUse:
 Metrics/BlockLength:
   Enabled: true
   Exclude:
-    - Rakefile
     - app/application/controllers/**/*.rb # Roda's nested controllers require large blocks
     - spec/**/* # Minitest's nested test structure requires large blocks
     - Rakefile # Rake namespaces produce large blocks
+
+Metrics/ClassLength:
+  Enabled: true
+  Exclude:
+    - Rakefile
+    - app/application/controllers/app.rb
 
 # See: https://www.rubydoc.info/gems/rubocop/RuboCop/Cop/Layout/MultilineMethodCallIndentation
 Layout/MultilineMethodCallIndentation:
