@@ -131,6 +131,14 @@ module MealDecoder
       routing.on 'api' do
         routing.on 'v1' do
           routing.on 'dishes' do
+            # GET /api/v1/dishes/{id} - Get dish by ID
+            routing.get Integer do |id|
+              result = Services::FetchDishById.new.call(id)
+              status, body = ResponseHandler.api_response_with_status(result)
+              response.status = status
+              body
+            end
+
             # GET /api/v1/dishes - Get recent dishes or search by name
             routing.get do
               # If q parameter is present, perform dish search

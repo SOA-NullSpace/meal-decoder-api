@@ -7,9 +7,6 @@ AllCops:
     - 'Gemfile'
     - 'Rakefile'
     - '**/*.rb'
-  Exclude:
-    # - 'spec/**/*'
-    - 'merge.rb'
 
 require:
   - rubocop-minitest

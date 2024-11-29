@@ -79,6 +79,32 @@ describe 'API acceptance tests' do
       _(result['count']).must_equal 0
       _(result['recent_dishes']).must_be_empty
     end
+
+    it 'HAPPY: should get dish by ID' do
+      # First create a test dish
+      dish = MealDecoder::Entity::Dish.new(
+        id: nil,
+        name: 'TestDish',
+        ingredients: ['test ingredient']
+      )
+      stored_dish = MealDecoder::Repository::For.entity(dish).create(dish)
+
+      # Test retrieving the dish by ID
+      get "/api/v1/dishes/#{stored_dish.id}"
+      _(last_response.status).must_equal 200
+
+      result = JSON.parse(last_response.body)
+      _(result['id']).must_equal stored_dish.id
+      _(result['name']).must_equal 'TestDish'
+    end
+
+    it 'SAD: should return error for non-existent dish ID in GET request' do
+      get '/api/v1/dishes/999999'
+      _(last_response.status).must_equal 404
+
+      result = JSON.parse(last_response.body)
+      _(result['message']).must_include 'Could not find dish with ID'
+    end
   end
 
   describe 'Vision API tests' do
