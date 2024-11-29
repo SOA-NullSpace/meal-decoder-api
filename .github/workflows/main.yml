@@ -1,4 +1,5 @@
 name: API continuous integration
+
 on:
   push:
     branches: [main]
@@ -11,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu]
+        os: [ubuntu, macos]
         ruby: ["3.3.5"]
 
     runs-on: ${{ matrix.os }}-latest
@@ -20,9 +21,6 @@ jobs:
       BUNDLE_WITHOUT: production
       RACK_ENV: test
       DATABASE_URL: sqlite://db/local/test.db
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
-      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,19 +34,32 @@ jobs:
         run: |
           mkdir -p db/local
           touch db/local/test.db
-
       - name: Create secrets.yml
         run: |
           mkdir -p config
-          echo "---" > config/secrets.yml
-          echo "test:" >> config/secrets.yml
-          echo "  DB_FILENAME: db/local/test.db" >> config/secrets.yml
-          echo "  OPENAI_API_KEY: \"$OPENAI_API_KEY\"" >> config/secrets.yml
-          echo "  GOOGLE_CLOUD_API_TOKEN: \"$GOOGLE_CLOUD_API_TOKEN\"" >> config/secrets.yml
-          echo "  SESSION_SECRET: \"$SESSION_SECRET\"" >> config/secrets.yml
-
+          cat > config/secrets.yml << EOL
+          ---
+          development:
+            DB_FILENAME: db/local/dev.db
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+          test:
+            DB_FILENAME: db/local/test.db
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+          production:
+            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
+            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
+          EOL
       - name: Setup test database
         run: bundle exec rake db:migrate
 
+      - name: Copy VCR cassettes from fixtures
+        run: |
+          mkdir -p spec/fixtures/cassettes
+          cp spec/fixtures/*.yml spec/fixtures/cassettes/ || true
       - name: Run all specs
         run: bundle exec rake spec
