@@ -139,8 +139,11 @@ module MealDecoder
               body
             end
 
-            # GET /api/v1/dishes/{name}
-            routing.get String do |dish_name|
+            # GET /api/v1/dishes?q={dish_name}
+            routing.get do
+              dish_name = routing.params['q']
+              return { message: 'Missing dish name parameter' }.to_json if dish_name.nil? || dish_name.empty?
+
               result = Services::FetchDish.new.call(dish_name)
 
               status, body = ResponseHandler.api_response_with_status(result)

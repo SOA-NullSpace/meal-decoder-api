@@ -42,6 +42,23 @@ describe 'API acceptance tests' do
       end
     end
 
+    it 'HAPPY: should retrieve a dish with spaces in name' do
+      # First, create a test dish with spaces
+      dish = MealDecoder::Entity::Dish.new(
+        id: nil,
+        name: 'Chicken Fried Rice',
+        ingredients: %w[chicken rice]
+      )
+      stored_dish = MealDecoder::Repository::For.entity(dish).create(dish)
+
+      # Test retrieving the dish using the query parameter
+      get "/api/v1/dishes?q=#{CGI.escape(stored_dish.name)}"
+      _(last_response.status).must_equal 200
+
+      result = JSON.parse(last_response.body)
+      _(result['name']).must_equal 'Chicken Fried Rice'
+    end
+
     it 'HAPPY: should delete a dish' do
       # First, create a test dish
       dish = MealDecoder::Entity::Dish.new(
@@ -55,12 +72,12 @@ describe 'API acceptance tests' do
       _(last_response.status).must_equal 200
 
       # Verify the dish is gone
-      get "/api/v1/dishes/#{CGI.escape(stored_dish.name)}"
+      get "/api/v1/dishes?q=#{CGI.escape(stored_dish.name)}"
       _(last_response.status).must_equal 404
     end
 
     it 'SAD: should return error for non-existent dish' do
-      get '/api/v1/dishes/nonexistentdish'
+      get '/api/v1/dishes?q=nonexistentdish'
       _(last_response.status).must_equal 404
     end
   end
