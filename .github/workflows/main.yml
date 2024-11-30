@@ -1,65 +1,50 @@
+# API testing workflow config for CI/CD on Github
+
 name: API continuous integration
 
+# Controls when the action will run.
 on:
+  # Triggers the workflow for main branch on git push
   push:
     branches: [main]
+  # Triggers workflow for or any branch on pull requests
   pull_request:
-    branches: ["**"]
+    branches:
+      - "**"
+  # Allows running this workflow manually from the Actions tab
   workflow_dispatch:
 
+# A workflow is defined of one or more jobs that can run sequentially or in parallel
 jobs:
+  # This workflow contains a single job called "api_test"
   api_test:
     strategy:
+      # don't cancel other jobs if one fails
       fail-fast: false
       matrix:
         os: [ubuntu, macos]
-        ruby: ["3.3.5"]
-
-    runs-on: ${{ matrix.os }}-latest
-
+    runs-on: ${{ matrix.os }}-latest # Runs on latest builds of matrix OSes
     env:
-      BUNDLE_WITHOUT: production
-      RACK_ENV: test
-      DATABASE_URL: sqlite://db/local/test.db
-
+      BUNDLE_WITHOUT: production # skip installing production gem (pg)
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
+      # Builds on a predefined action that has Ruby installed
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
 
-      - name: Create database directory
-        run: |
-          mkdir -p db/local
-          touch db/local/test.db
-      - name: Create secrets.yml
-        run: |
-          mkdir -p config
-          cat > config/secrets.yml << EOL
-          ---
-          development:
-            DB_FILENAME: db/local/dev.db
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
-          test:
-            DB_FILENAME: db/local/test.db
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
-          production:
-            OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-            GOOGLE_CLOUD_API_TOKEN: "${{ secrets.GOOGLE_CLOUD_API_TOKEN }}"
-            SESSION_SECRET: "${{ secrets.SESSION_SECRET }}"
-          EOL
       - name: Setup test database
-        run: bundle exec rake db:migrate
+        env: # define secrets in Github project -> settings -> secrets
+          DB_FILENAME: ${{ secrets.DB_FILENAME }}
+        run: RACK_ENV=test bundle exec rake db:migrate
 
-      - name: Copy VCR cassettes from fixtures
-        run: |
-          mkdir -p spec/fixtures/cassettes
-          cp spec/fixtures/*.yml spec/fixtures/cassettes/ || true
       - name: Run all specs
+        env: # define secrets in Github project -> settings -> secrets
+          DB_FILENAME: ${{ secrets.DB_FILENAME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
         run: bundle exec rake spec
