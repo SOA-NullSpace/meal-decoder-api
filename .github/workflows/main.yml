@@ -26,6 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest # Runs on latest builds of matrix OSes
     env:
       BUNDLE_WITHOUT: production # skip installing production gem (pg)
+      RACK_ENV: test
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -36,15 +37,20 @@ jobs:
         with:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
 
+      - name: Create config directory and secrets.yml
+        run: |
+          mkdir -p config
+          cat > config/secrets.yml << EOL
+          ---
+          test:
+            DB_FILENAME: ${{ secrets.DB_FILENAME }}
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
+            SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          EOL
+
       - name: Setup test database
-        env: # define secrets in Github project -> settings -> secrets
-          DB_FILENAME: ${{ secrets.DB_FILENAME }}
-        run: RACK_ENV=test bundle exec rake db:migrate
+        run: bundle exec rake db:migrate
 
       - name: Run all specs
-        env: # define secrets in Github project -> settings -> secrets
-          DB_FILENAME: ${{ secrets.DB_FILENAME }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
         run: bundle exec rake spec
