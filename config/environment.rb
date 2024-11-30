@@ -51,7 +51,7 @@ module MealDecoder
           same_site: :strict
     end
 
-    configure :development, :test do
+    configure :development, :test, :app_test do
       require 'pry'
       # Make sure the db directory exists
       db_path = File.expand_path("db/local/#{environment}.db")
