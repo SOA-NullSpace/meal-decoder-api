@@ -1,0 +1,56 @@
+# API testing workflow config for CI/CD on Github
+
+name: API continuous integration
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow for main branch on git push
+  push:
+    branches: [main]
+  # Triggers workflow for or any branch on pull requests
+  pull_request:
+    branches:
+      - "**"
+  # Allows running this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow is defined of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "api_test"
+  api_test:
+    strategy:
+      # don't cancel other jobs if one fails
+      fail-fast: false
+      matrix:
+        os: [ubuntu, macos]
+    runs-on: ${{ matrix.os }}-latest # Runs on latest builds of matrix OSes
+    env:
+      BUNDLE_WITHOUT: production # skip installing production gem (pg)
+      RACK_ENV: test
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+
+      # Builds on a predefined action that has Ruby installed
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+
+      - name: Create config directory and secrets.yml
+        run: |
+          mkdir -p config
+          cat > config/secrets.yml << EOL
+          ---
+          test:
+            DB_FILENAME: ${{ secrets.DB_FILENAME }}
+            OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            GOOGLE_CLOUD_API_TOKEN: ${{ secrets.GOOGLE_CLOUD_API_TOKEN }}
+            SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          EOL
+
+      - name: Setup test database
+        run: bundle exec rake db:migrate
+
+      - name: Run all specs
+        run: bundle exec rake spec

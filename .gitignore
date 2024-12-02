@@ -10,3 +10,4 @@ coverage/*
 !coverage/.resultset.json
 *.db
 .bundle/
+!db/local/_readme.txt
