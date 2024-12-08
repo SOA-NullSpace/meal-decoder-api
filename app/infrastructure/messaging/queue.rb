@@ -9,13 +9,26 @@ module MealDecoder
     class Queue
       IDLE_TIMEOUT = 5 # seconds
 
+      # Encapsulates AWS configuration and credentials management
+      # Provides a clean interface for accessing AWS credentials
+      class QueueConfig
+        def initialize(config)
+          @config = config
+        end
+
+        def credentials
+          {
+            access_key_id: @config.AWS_ACCESS_KEY_ID,
+            secret_access_key: @config.AWS_SECRET_ACCESS_KEY,
+            region: @config.AWS_REGION
+          }
+        end
+      end
+
       def initialize(queue_url, config)
         @queue_url = queue_url
-        @sqs = Aws::SQS::Client.new(
-          access_key_id: config.AWS_ACCESS_KEY_ID,
-          secret_access_key: config.AWS_SECRET_ACCESS_KEY,
-          region: config.AWS_REGION
-        )
+        queue_config = QueueConfig.new(config)
+        @sqs = Aws::SQS::Client.new(queue_config.credentials)
       end
 
       ## Sends message to queue

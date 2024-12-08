@@ -8,6 +8,36 @@ require 'shoryuken'
 
 module MealDecoder
   module Workers
+    # Processes dish requests and manages their lifecycle
+    # Handles creation, processing, and storage of dish data
+    class DishProcessor
+      def initialize(api_key = App.config.OPENAI_API_KEY)
+        @mapper = Mappers::DishMapper.new(
+          Gateways::OpenAIAPI.new(api_key)
+        )
+      end
+
+      def process_request(request)
+        dish_request = JSON.parse(request).transform_keys(&:to_sym)
+        dish = process(dish_request[:dish_name])
+        store_dish(dish)
+        dish
+      end
+
+      private
+
+      def process(dish_name)
+        @mapper.find(dish_name)
+      end
+
+      def store_dish(dish)
+        Repository::For.entity(dish).create(dish)
+      rescue StandardError => processing_error
+        puts "PROCESSOR: Error storing dish: #{processing_error.message}"
+        raise
+      end
+    end
+
     # Shoryuken worker class to process dish ingredient requests
     class DishWorker
       # Environment variables setup
@@ -26,38 +56,17 @@ module MealDecoder
 
       include Shoryuken::Worker
 
-      # Make sure this matches your queue name in config/secrets.yml
       shoryuken_options queue: ENV.fetch('CLONE_QUEUE', nil), auto_delete: true
+
+      def initialize
+        super
+        @processor = DishProcessor.new
+      end
 
       def perform(_sqs_msg, request)
         puts "WORKER: Processing dish request #{request}"
-        # Parse the request
-        dish_request = JSON.parse(request).transform_keys(&:to_sym)
-
-        # Process the dish request
-        dish = process_dish_request(dish_request)
-
-        # Store the result
-        store_dish_result(dish)
+        dish = @processor.process_request(request)
         puts "WORKER: Dish stored #{dish.name}"
-      end
-
-      private
-
-      def process_dish_request(request)
-        # Create dish using the existing mapper
-        mapper = Mappers::DishMapper.new(
-          Gateways::OpenAIAPI.new(App.config.OPENAI_API_KEY)
-        )
-
-        mapper.find(request[:dish_name])
-      end
-
-      def store_dish_result(dish)
-        Repository::For.entity(dish).create(dish)
-      rescue StandardError => e
-        puts "WORKER: Error storing dish: #{e.message}"
-        raise
       end
     end
   end

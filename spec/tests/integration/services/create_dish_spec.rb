@@ -39,7 +39,6 @@ module MealDecoder
 
     it 'SAD: should return Failure for invalid input' do
       VCR.use_cassette('service_create_invalid_dish') do
-        # Test with invalid input (e.g., empty dish name)
         result = Services::CreateDish.new.call(
           dish_name: '',
           session: @session
@@ -52,16 +51,13 @@ module MealDecoder
     end
 
     it 'SAD: should return Failure when queue is unavailable' do
-      # Create a service with a mock queue that raises an error
+      # Create a mock queue that raises an error
       bad_queue = Minitest::Mock.new
-      bad_queue.expect :send, nil do |_message|
+      def bad_queue.send(_)
         raise StandardError, 'Queue unavailable'
       end
 
-      service = Services::CreateDish.new(
-        validator: Request::Dish.new, # Changed from Validation to Request
-        queue: bad_queue
-      )
+      service = Services::CreateDish.with_queue(bad_queue)
 
       result = service.call(
         dish_name: 'Pizza',
@@ -70,7 +66,6 @@ module MealDecoder
 
       _(result).must_be_kind_of Dry::Monads::Failure
       _(result.failure).must_include 'Queue Error'
-      bad_queue.verify
     end
   end
 end
