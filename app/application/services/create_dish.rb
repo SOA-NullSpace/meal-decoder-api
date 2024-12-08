@@ -4,19 +4,30 @@ require 'dry/monads'
 
 module MealDecoder
   module Services
+    # Creates and manages queues for the application
+    class QueueFactory
+      def self.create(config = App.config)
+        Messaging::Queue.new(config.CLONE_QUEUE_URL, config)
+      end
+    end
+
     # Service to create new dish from API and store in repository
     class CreateDish
       include Dry::Monads[:result]
 
-      def initialize(validator: Validation::DishContract.new,
-                     result_handler: ResultHandler.new)
+      # Creates a service using test doubles if in test environment
+      def self.with_queue(queue)
+        new(validator: Request::Dish.new, queue:)
+      end
+
+      def initialize(validator: Request::Dish.new, queue: QueueFactory.create)
         @validator = validator
-        @result_handler = result_handler
+        @queue = queue
       end
 
       def call(input)
         validate(input)
-          .bind { |data| process_dish(data) }
+          .bind { |data| queue_dish_request(data) }
       end
 
       private
@@ -30,17 +41,31 @@ module MealDecoder
         end
       end
 
-      def process_dish(input)
-        dish_result = create_and_store_dish(input[:dish_name])
-        @result_handler.handle_dish_result(dish_result, input[:session])
+      def queue_dish_request(input)
+        message_id = send_to_queue(input)
+        create_processing_response(input, message_id)
       rescue StandardError => error
-        Failure("API Error: #{error.message}")
+        Failure("Queue Error: #{error.message}")
       end
 
-      def create_and_store_dish(dish_name)
-        dish = APIFactory.create_mapper.find(dish_name)
-        stored_dish = Repository::For.entity(dish).create(dish)
-        Success(stored_dish)
+      def send_to_queue(input)
+        @queue.send({
+                      dish_name: input[:dish_name],
+                      timestamp: Time.now
+                    })
+      end
+
+      def create_processing_response(input, message_id)
+        Success(
+          Response::ApiResult.new(
+            status: :processing,
+            message: 'Dish request is being processed',
+            data: {
+              dish_name: input[:dish_name],
+              message_id:
+            }
+          )
+        )
       end
     end
   end

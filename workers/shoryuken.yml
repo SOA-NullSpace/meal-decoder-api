@@ -1,0 +1,4 @@
+concurrency: 5
+delay: 0
+queues:
+  - ['meal-decoder-clone-production', 1]
