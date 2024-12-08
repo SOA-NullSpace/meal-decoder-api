@@ -48,6 +48,10 @@ group :production do
   gem 'pg'
 end
 
+# Asynchronicity
+gem 'aws-sdk-sqs', '1.89'
+gem 'shoryuken', '6.2'
+
 # Testing
 group :test do
   gem 'minitest', '5.25'
