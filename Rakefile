@@ -170,45 +170,39 @@ namespace :queues do
 
   desc 'Create SQS queue for worker'
   task create: :config do
-    begin
-      # Try to create the queue
-      resp = @sqs.create_queue(queue_name: @q_name)
-      @q_url = resp.queue_url
+    # Try to create the queue
+    resp = @sqs.create_queue(queue_name: @q_name)
+    @q_url = resp.queue_url
 
-      puts 'Queue created:'
-      puts "  Name: #{@q_name}"
-      puts "  Region: #{@api.config.AWS_REGION}"
-      puts "  URL: #{@q_url}"
-    rescue StandardError => e
-      puts "Error creating queue: #{e}"
-    end
+    puts 'Queue created:'
+    puts "  Name: #{@q_name}"
+    puts "  Region: #{@api.config.AWS_REGION}"
+    puts "  URL: #{@q_url}"
+  rescue StandardError => e
+    puts "Error creating queue: #{e}"
   end
 
   desc 'Report status of queue for worker'
   task status: :config do
-    begin
-      @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
+    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
 
-      puts 'Queue info:'
-      puts "  Name: #{@q_name}"
-      puts "  Region: #{@api.config.AWS_REGION}"
-      puts "  URL: #{@q_url}"
-    rescue StandardError => e
-      puts "Error finding queue: #{e}"
-      puts "Try running 'rake queues:create' first"
-    end
+    puts 'Queue info:'
+    puts "  Name: #{@q_name}"
+    puts "  Region: #{@api.config.AWS_REGION}"
+    puts "  URL: #{@q_url}"
+  rescue StandardError => e
+    puts "Error finding queue: #{e}"
+    puts "Try running 'rake queues:create' first"
   end
 
   desc 'Purge messages in SQS queue for worker'
   task purge: :config do
-    begin
-      @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
-      @sqs.purge_queue(queue_url: @q_url)
-      puts "Queue #{@q_name} purged"
-    rescue StandardError => e
-      puts "Error purging queue: #{e}"
-      puts "Try running 'rake queues:create' first"
-    end
+    @q_url = @sqs.get_queue_url(queue_name: @q_name).queue_url
+    @sqs.purge_queue(queue_url: @q_url)
+    puts "Queue #{@q_name} purged"
+  rescue StandardError => e
+    puts "Error purging queue: #{e}"
+    puts "Try running 'rake queues:create' first"
   end
 end
 
