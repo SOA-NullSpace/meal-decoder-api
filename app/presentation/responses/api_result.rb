@@ -11,6 +11,10 @@ module MealDecoder
         @message = message
         @data = data
       end
+
+      def success?
+        %i[success processing].include?(@status)
+      end
     end
   end
 end

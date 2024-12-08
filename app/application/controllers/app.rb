@@ -171,22 +171,22 @@ module MealDecoder
               request_data = parse_json_request(routing.body.read)
               result = Services::CreateDish.new.call(
                 dish_name: request_data['dish_name'],
-                session: {}
+                session:
               )
 
               if result.success?
-                # Initialize session array if needed
-                session[:searched_dishes] ||= []
-
-                # Add to recent dishes
-                dish_name = result.value!.name
-                session[:searched_dishes].delete(dish_name) # Remove if exists
-                session[:searched_dishes].unshift(dish_name) # Add to front
+                api_result = result.value!
+                # If the status is :processing, return 202 Accepted
+                response.status = api_result.status == :processing ? 202 : 201
+                {
+                  status: api_result.status,
+                  message: api_result.message,
+                  data: api_result.data
+                }.to_json
+              else
+                response.status = 400
+                { message: result.failure }.to_json
               end
-
-              status, body = ResponseHandler.api_response(result)
-              response.status = status
-              body
             end
 
             # DELETE /api/v1/dishes/{id}

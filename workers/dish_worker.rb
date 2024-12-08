@@ -10,39 +10,31 @@ module MealDecoder
   module Workers
     # Shoryuken worker class to process dish ingredient requests
     class DishWorker
-      # Environment variables setup
-      Figaro.application = Figaro::Application.new(
-        environment: ENV['RACK_ENV'] || 'development',
-        path: File.expand_path('config/secrets.yml')
-      )
-      Figaro.load
-      def self.config = Figaro.env
-
-      Shoryuken.sqs_client = Aws::SQS::Client.new(
-        access_key_id: config.AWS_ACCESS_KEY_ID,
-        secret_access_key: config.AWS_SECRET_ACCESS_KEY,
-        region: config.AWS_REGION
-      )
-
       include Shoryuken::Worker
 
-      shoryuken_options queue: 'meal_decoder_queue', auto_delete: true
+      shoryuken_options queue: 'meal-decoder-clone-test', auto_delete: true  # Make sure this matches your queue name exactly
 
       def perform(_sqs_msg, request)
-        # Parse the request
-        dish_request = JSON.parse(request).transform_keys(&:to_sym)
+        puts "WORKER: Processing dish request #{request}"
+        begin
+          # Parse the request
+          dish_request = JSON.parse(request).transform_keys(&:to_sym)
 
-        # Process the dish request
-        dish = process_dish_request(dish_request)
+          # Process the dish request
+          dish = process_dish_request(dish_request)
 
-        # Store the result
-        store_dish_result(dish)
+          # Store the result
+          store_dish_result(dish)
+          puts "WORKER: Successfully processed dish #{dish.name}"
+        rescue StandardError => e
+          puts "WORKER ERROR: #{e.message}"
+          raise
+        end
       end
 
       private
 
       def process_dish_request(request)
-        # Create dish using the existing mapper
         mapper = Mappers::DishMapper.new(
           Gateways::OpenAIAPI.new(App.config.OPENAI_API_KEY)
         )
@@ -52,9 +44,6 @@ module MealDecoder
 
       def store_dish_result(dish)
         Repository::For.entity(dish).create(dish)
-      rescue StandardError => e
-        puts "Error storing dish: #{e.message}"
-        raise
       end
     end
   end
