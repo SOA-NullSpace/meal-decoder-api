@@ -1,2 +1,4 @@
+concurrency: 2
+delay: 0
 queues:
-  - https://sqs.ap-northeast-1.amazonaws.com/225989340162/meal-decoder-clone-development
+  - ['meal-decoder-clone-dev', 1]

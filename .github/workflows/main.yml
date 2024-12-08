@@ -59,7 +59,15 @@ jobs:
       - name: Setup test database
         run: bundle exec rake db:migrate
 
-      - name: Run all specs
+      - name: Start worker
         run: |
-          rake worker:run:test &
-          bundle exec rake spec
+          RACK_ENV=test bundle exec rake worker:run:test &
+          echo $! > worker.pid
+          sleep 5 # Give worker time to start
+
+      - name: Run all specs
+        run: bundle exec rake spec
+
+      - name: Stop worker
+        if: always()
+        run: kill $(cat worker.pid)

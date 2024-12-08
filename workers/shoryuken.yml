@@ -1,2 +1,4 @@
+concurrency: 5
+delay: 0
 queues:
-  - https://sqs.us-east-1.amazonaws.com/225989340162/meal-decoder-clone-production
+  - ['meal-decoder-clone-production', 1]
