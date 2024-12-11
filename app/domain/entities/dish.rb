@@ -14,6 +14,8 @@ module MealDecoder
       attribute :id, Types::Integer.optional
       attribute :name, Types::Strict::String
       attribute :ingredients, Types::Array.of(Types::Strict::String)
+      attribute? :status, Types::String.default('processing')
+      attribute? :message_id, Types::String.optional
 
       def total_calories
         ingredients.sum { |ingredient| MealDecoder::Lib::NutritionCalculator.get_calories(ingredient) }
