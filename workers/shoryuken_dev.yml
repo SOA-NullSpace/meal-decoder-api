@@ -1,4 +1,4 @@
 concurrency: 2
 delay: 0
 queues:
-  - ['meal-decoder-clone-dev', 1]
+  - ["meal-decoder-clone-development", 1]
