@@ -121,7 +121,7 @@ module MealDecoder
     end
 
     route do |routing|
-      response['Content-Type'] = 'application/json'
+      response['Content-Type'] = 'application/json; charset=utf-8'
 
       # Handle Faye WebSocket requests
       routing.on 'faye' do

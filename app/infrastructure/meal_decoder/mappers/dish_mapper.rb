@@ -60,7 +60,7 @@ module MealDecoder
       end
 
       def fetch_ingredients_text(dish_name)
-        puts "Retrieving ingredients from OpenAI for: #{dish_name}"
+        puts "Retrieving ingredients for #{dish_name}"
         @openai_gateway.fetch_ingredients(dish_name).tap do |ingredients_text|
           puts "Ingredients retrieved: #{ingredients_text}"
         end

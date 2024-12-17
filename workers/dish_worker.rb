@@ -46,7 +46,7 @@ module MealDecoder
         end
 
         # Process the dish through OpenAI
-        puts 'Fetching dish information from OpenAI'
+        puts 'Fetching dish information'
         processed_dish = @mapper.find(dish_name)
         puts "OpenAI returned #{processed_dish.ingredients.count} ingredients"
 
@@ -115,7 +115,7 @@ module MealDecoder
           job.report_progress(10, 'Initializing dish processing...')
           
           # OpenAI processing phase
-          job.report_progress(30, 'Fetching dish information from OpenAI...')
+          job.report_progress(30, 'Fetching dish information...')
           dish = @processor.process_request(request_data)
           
           # Database update phase
