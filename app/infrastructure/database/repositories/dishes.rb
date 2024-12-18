@@ -44,7 +44,7 @@ module MealDecoder
           .all
 
         puts "\nFetching all dishes from database..."
-        
+
         # Map all dishes to entities, including those in processing
         dishes = all_dishes.map do |db_dish|
           dish = rebuild_entity(db_dish)
@@ -119,13 +119,17 @@ module MealDecoder
         end
 
         def update_ingredients(db_dish, ingredients)
-          # Remove existing ingredients
           db_dish.remove_all_ingredients
-
-          # Add new ingredients
-          ingredients.each do |ingredient_name|
+          ingredients.uniq.each do |ingredient_name|
+            # Find or create ingredient record
             ingredient = Database::IngredientOrm.find_or_create(name: ingredient_name)
-            db_dish.add_ingredient(ingredient)
+            # Add association only if it doesn't exist
+            begin
+              db_dish.add_ingredient(ingredient) unless db_dish.ingredients.include?(ingredient)
+            rescue Sequel::UniqueConstraintViolation
+              puts "Skipping duplicate ingredient: #{ingredient_name}"
+              next
+            end
           end
         end
 

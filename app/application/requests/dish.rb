@@ -13,7 +13,7 @@ module MealDecoder
 
       rule(:dish_name) do
         # Check if dish name contains only letters and spaces from any language
-        key.failure('must contain only letters and spaces') unless /\A[\p{L}\p{M}\p{Zs}]+\z/u.match?(value)
+        key.failure('must contain only letters and spaces') unless /\A[\p{L}\p{N}\s]+\z/u.match?(value)
 
         # Check length
         key.failure('must be less than 100 characters') if value.length > 100

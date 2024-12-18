@@ -34,7 +34,7 @@ module MealDecoder
            }
 
     @api_host = if ENV['RACK_ENV'] == 'production'
-                  'https://your-production-url.com'
+                  config.API_HOST
                 else
                   'http://localhost:9292'
                 end
