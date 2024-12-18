@@ -25,6 +25,11 @@ module MealDecoder
       def self.find_or_create(dish_info)
         first(name: dish_info[:name]) || create(dish_info)
       end
+
+      def before_create
+        super
+        self.status ||= 'processing'
+      end
     end
   end
 end

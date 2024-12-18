@@ -121,7 +121,13 @@ module MealDecoder
     end
 
     route do |routing|
-      response['Content-Type'] = 'application/json'
+      response['Content-Type'] = 'application/json; charset=utf-8'
+
+      # Handle Faye WebSocket requests
+      routing.on 'faye' do
+        # Faye middleware handles these requests
+        pass
+      end
 
       routing.root do
         response.status = 200
@@ -148,29 +154,27 @@ module MealDecoder
 
             # GET /api/v1/dishes - Get recent dishes or search by name
             routing.get do
-              # If q parameter is present, perform dish search
-              if routing.params['q']
-                dish_name = routing.params['q']
-                result = Services::FetchDish.new.call(dish_name)
-                status, body = ResponseHandler.api_response_with_status(result)
-                response.status = status
-                return body
+              begin
+                dishes = Repository::For.klass(Entity::Dish).all
+                puts "Found #{dishes.length} dishes in database"
+
+                response.status = 200
+                {
+                  count: dishes.length,
+                  recent_dishes: dishes.map do |dish|
+                    puts "Processing dish: #{dish.name} (Status: #{dish.status})"
+                    # Include all dishes, but with appropriate status
+                    dish_data = dish.to_h
+                    dish_data[:status] = dish.status
+                    dish_data
+                  end
+                }.to_json
+              rescue StandardError => e
+                puts "Error fetching dishes: #{e.message}"
+                puts e.backtrace
+                response.status = 500
+                { message: "Error fetching dishes: #{e.message}" }.to_json
               end
-
-              # Otherwise return recent dishes
-              response.status = 200
-              dish_names = session[:searched_dishes] || []
-              recent_dishes = []
-
-              dish_names.each do |name|
-                dish = Services::FetchDish.new.call(name)
-                recent_dishes << dish.value! if dish.success?
-              end
-
-              {
-                count: recent_dishes.length,
-                recent_dishes: recent_dishes.map(&:to_h)
-              }.to_json
             end
 
             # POST /api/v1/dishes
@@ -185,10 +189,29 @@ module MealDecoder
                 api_result = result.value!
                 # If the status is :processing, return 202 Accepted
                 response.status = api_result.status == :processing ? 202 : 201
+
+                # Create an initial database record
+                dish = Repository::For.klass(Entity::Dish).create(
+                  Entity::Dish.new(
+                    id: nil,
+                    name: request_data['dish_name'],
+                    ingredients: [],
+                    status: 'processing',
+                    message_id: api_result.data[:message_id]
+                  )
+                )
+
+                channel_id = api_result.data[:channel_id]
                 {
                   status: api_result.status,
                   message: api_result.message,
-                  data: api_result.data
+                  data: api_result.data.merge(
+                    dish_id: dish&.id
+                  ),
+                  progress: {
+                    channel: "/progress/#{channel_id}",
+                    endpoint: "#{App.api_host}/faye"
+                  }
                 }.to_json
               else
                 response.status = 400

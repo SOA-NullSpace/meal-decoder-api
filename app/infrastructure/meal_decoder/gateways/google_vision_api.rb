@@ -1,3 +1,4 @@
+# app/infrastructure/meal_decoder/gateways/google_vision_api.rb
 # frozen_string_literal: true
 
 require 'net/http'
@@ -7,22 +8,6 @@ require 'base64'
 
 module MealDecoder
   module Gateways
-    # Value object for encapsulating text annotation data
-    class TextAnnotation
-      def self.from_hash(annotation_hash)
-        new(annotation_hash.fetch('description', '')) if annotation_hash
-      end
-
-      def initialize(text)
-        @text = text
-      end
-
-      def to_s
-        @text.strip
-      end
-    end
-
-    # The GoogleVisionAPI class provides methods to interact with the Google Vision API for image analysis.
     class GoogleVisionAPI
       BASE_URL = 'https://vision.googleapis.com/v1/images:annotate'
 
@@ -34,7 +19,21 @@ module MealDecoder
         raise Errno::ENOENT, "File not found: #{image_path}" unless File.exist?(image_path)
 
         response = send_request(image_path)
-        parse_text_from_response(response)
+        parsed_response = handle_response(response)
+
+        {
+          'success' => true,
+          'text'    => parsed_response,
+          'message' => 'Text detection successful'
+        }
+      rescue StandardError => e
+        puts "Vision API Error: #{e.message}"
+        puts e.backtrace
+        {
+          'success' => false,
+          'text'    => nil,
+          'message' => "Vision API Error: #{e.message}"
+        }
       end
 
       private
@@ -42,6 +41,7 @@ module MealDecoder
       def send_request(image_path)
         uri = build_uri
         request = build_request(image_path)
+
         Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
           http.request(request)
         end
@@ -52,40 +52,58 @@ module MealDecoder
       end
 
       def build_request(image_path)
-        Net::HTTP::Post.new(build_uri).tap do |req|
-          req.content_type = 'application/json'
-          req.body = build_request_body(image_path)
-        end
+        request = Net::HTTP::Post.new(build_uri)
+        request.content_type = 'application/json'
+        request.body = JSON.dump(build_request_body(image_path))
+        request
       end
 
-      # :reek:UtilityFunction
       def build_request_body(image_path)
-        JSON.dump(
+        {
           requests: [{
             image: {
               content: Base64.strict_encode64(File.read(image_path))
             },
             features: [{
-              type: 'TEXT_DETECTION'
-            }]
+              type: 'TEXT_DETECTION',
+              maxResults: 50
+            }],
+            imageContext: {
+              languageHints: %w[en zh-TW zh-CN]
+            }
           }]
-        )
+        }
       end
 
-      # :reek:FeatureEnvy
-      def parse_text_from_response(response)
-        raise "API request failed with status code: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+      def handle_response(response)
+        unless response.is_a?(Net::HTTPSuccess)
+          handle_error_response(response)
+          return nil
+        end
 
+        parse_success_response(response)
+      end
+
+      def handle_error_response(response)
+        error_message = case response.code
+                        when '400' then 'Bad Request: Invalid image format or size'
+                        when '401' then 'Unauthorized: Invalid API key'
+                        when '403' then 'Forbidden: API key lacks required permissions'
+                        else "API request failed with status code: #{response.code}"
+                        end
+        raise error_message
+      end
+
+      def parse_success_response(response)
         json_response = JSON.parse(response.body)
-        annotations = json_response.dig('responses', 0, 'textAnnotations') || []
-        extract_text_from_annotations(annotations)
+        extract_text_from_response(json_response)
       end
 
-      # :reek:UtilityFunction
-      def extract_text_from_annotations(annotations)
-        return '' if annotations.empty?
+      def extract_text_from_response(json_response)
+        text_annotations = json_response.dig('responses', 0, 'textAnnotations')
+        return '' if text_annotations.nil? || text_annotations.empty?
 
-        TextAnnotation.from_hash(annotations.first).to_s
+        text_annotations.first['description'].strip
       end
     end
   end

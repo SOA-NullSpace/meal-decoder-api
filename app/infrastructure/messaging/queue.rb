@@ -6,6 +6,8 @@ module MealDecoder
   module Messaging
     ## Queue wrapper for AWS SQS
     # Requires: AWS credentials loaded in ENV or through config file
+    # Creates and manages queues for the application
+
     class Queue
       IDLE_TIMEOUT = 5 # seconds
 
