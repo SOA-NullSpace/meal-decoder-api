@@ -8,7 +8,7 @@ require 'http'
 
 module MealDecoder
   module Workers
-    class ProgressPublisher 
+    class ProgressPublisher
       def initialize(config, channel_id)
         @config = config
         @channel_id = channel_id
@@ -17,23 +17,23 @@ module MealDecoder
 
       def publish(message)
         faye_url = "#{@api_host}/faye"
-        
+
         puts "Publishing to Faye: #{faye_url}, channel: /progress/#{@channel_id}"
-        
+
         begin
           response = HTTP.headers('Content-Type' => 'application/json')
             .post(faye_url, json: {
-              channel: "/progress/#{@channel_id}",
-              data: message
-            })
-          
+                    channel: "/progress/#{@channel_id}",
+                    data: message
+                  })
+
           if response.status.success?
             puts 'Successfully published progress update'
-          else  
+          else
             puts "Failed to publish progress: #{response.status} - #{response.body}"
             raise "Failed to publish progress: #{response.status}"
           end
-        rescue => e
+        rescue StandardError => e
           puts "Error publishing progress: #{e.message}"
           puts e.backtrace
           raise # Re-raise to ensure the worker sees the error

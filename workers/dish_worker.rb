@@ -113,22 +113,21 @@ module MealDecoder
 
           # Initial setup phase
           job.report_progress(10, 'Initializing dish processing...')
-          
+
           # OpenAI processing phase
           job.report_progress(30, 'Fetching dish information...')
           dish = @processor.process_request(request_data)
-          
+
           # Database update phase
           job.report_progress(70, 'Saving dish information to database...')
 
           # Verification phase
-          raise 'Failed to process dish: No ingredients found' unless dish && dish.ingredients.any?
+          raise 'Failed to process dish: No ingredients found' unless dish&.ingredients&.any?
 
           # Completion
           Repository::For.klass(Entity::Dish).update_status(dish.message_id, 'completed')
-          job.report_progress(100, 
-            "Successfully processed dish: #{dish.name} with #{dish.ingredients.count} ingredients")
-
+          job.report_progress(100,
+                              "Successfully processed dish: #{dish.name} with #{dish.ingredients.count} ingredients")
         rescue StandardError => e
           puts "WORKER ERROR: #{e.message}"
           puts e.backtrace
@@ -164,9 +163,9 @@ module MealDecoder
         return unless request_data
 
         message_id = request_data['message_id'] || request_data['request_id']
-        if message_id
-          Repository::For.klass(Entity::Dish).update_status(message_id, 'failed')
-        end
+        return unless message_id
+
+        Repository::For.klass(Entity::Dish).update_status(message_id, 'failed')
       end
     end
   end

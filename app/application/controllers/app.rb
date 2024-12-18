@@ -154,27 +154,25 @@ module MealDecoder
 
             # GET /api/v1/dishes - Get recent dishes or search by name
             routing.get do
-              begin
-                dishes = Repository::For.klass(Entity::Dish).all
-                puts "Found #{dishes.length} dishes in database"
+              dishes = Repository::For.klass(Entity::Dish).all
+              puts "Found #{dishes.length} dishes in database"
 
-                response.status = 200
-                {
-                  count: dishes.length,
-                  recent_dishes: dishes.map do |dish|
-                    puts "Processing dish: #{dish.name} (Status: #{dish.status})"
-                    # Include all dishes, but with appropriate status
-                    dish_data = dish.to_h
-                    dish_data[:status] = dish.status
-                    dish_data
-                  end
-                }.to_json
-              rescue StandardError => e
-                puts "Error fetching dishes: #{e.message}"
-                puts e.backtrace
-                response.status = 500
-                { message: "Error fetching dishes: #{e.message}" }.to_json
-              end
+              response.status = 200
+              {
+                count: dishes.length,
+                recent_dishes: dishes.map do |dish|
+                  puts "Processing dish: #{dish.name} (Status: #{dish.status})"
+                  # Include all dishes, but with appropriate status
+                  dish_data = dish.to_h
+                  dish_data[:status] = dish.status
+                  dish_data
+                end
+              }.to_json
+            rescue StandardError => e
+              puts "Error fetching dishes: #{e.message}"
+              puts e.backtrace
+              response.status = 500
+              { message: "Error fetching dishes: #{e.message}" }.to_json
             end
 
             # POST /api/v1/dishes

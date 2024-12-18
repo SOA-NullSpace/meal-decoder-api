@@ -33,8 +33,8 @@ gem 'dry-monads', '1.6'
 gem 'dry-transaction', '0.16.0'
 gem 'dry-validation', '1.10'
 
-gem 'figaro'
 gem 'faye', '1.4'
+gem 'figaro'
 
 # Database
 gem 'hirb'
