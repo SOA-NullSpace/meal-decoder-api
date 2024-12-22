@@ -3,9 +3,10 @@
 require 'dry/monads'
 require 'securerandom'
 
-# app/application/services/create_dish.rb
 module MealDecoder
   module Services
+    # Service for creating new dish entries and managing the creation process
+    # Handles validation, progress tracking, and request queueing
     class CreateDish
       include Dry::Monads[:result]
 
@@ -34,11 +35,7 @@ module MealDecoder
 
       def validate(input)
         validation = @validator.call(dish_name: input[:dish_name])
-        if validation.success?
-          Success(input)
-        else
-          Failure(validation.errors.to_h)
-        end
+        validation.success? ? Success(input) : Failure(validation.errors.to_h)
       end
 
       def generate_tracking_info(input)
@@ -48,38 +45,48 @@ module MealDecoder
 
       def queue_dish_request(input)
         message_id = send_to_queue(input)
-        create_processing_response(input, message_id)
+        build_processing_response(input, message_id)
       rescue StandardError => error
-        puts "Queue Error: #{error.message}"
-        puts error.backtrace
-        Failure("Queue Error: #{error.message}")
+        handle_queue_error(error)
       end
 
       def send_to_queue(input)
         message_id = SecureRandom.uuid
-        message = {
-          dish_name: input[:dish_name],
-          channel_id: input[:tracker].channel_id,
-          message_id: message_id,
-          timestamp: Time.now.to_i
-        }
-        puts "Sending message to queue: #{message.inspect}"
-        @queue.send(message)
+        @queue.send(build_queue_message(input, message_id))
         message_id
       end
 
-      def create_processing_response(input, message_id)
+      def build_queue_message(input, message_id)
+        {
+          dish_name: input[:dish_name],
+          channel_id: input[:tracker].channel_id,
+          message_id:,
+          timestamp: Time.now.to_i
+        }
+      end
+
+      def build_processing_response(input, message_id)
         Success(
           Response::ApiResult.new(
             status: :processing,
             message: 'Dish request is being processed',
-            data: {
-              dish_name: input[:dish_name],
-              message_id:,
-              channel_id: input[:tracker].channel_id
-            }
+            data: build_response_data(input, message_id)
           )
         )
+      end
+
+      def build_response_data(input, message_id)
+        {
+          dish_name: input[:dish_name],
+          message_id:,
+          channel_id: input[:tracker].channel_id
+        }
+      end
+
+      def handle_queue_error(error)
+        puts "Queue Error: #{error.message}"
+        puts error.backtrace
+        Failure("Queue Error: #{error.message}")
       end
     end
   end

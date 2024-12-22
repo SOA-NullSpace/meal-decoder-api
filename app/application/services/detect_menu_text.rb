@@ -4,6 +4,8 @@ require 'dry/monads'
 
 module MealDecoder
   module Services
+    # Service for detecting and processing text from menu images
+    # Handles image validation, text detection, and optional translation
     class DetectMenuText
       include Dry::Monads[:result]
 
@@ -25,17 +27,22 @@ module MealDecoder
         puts 'Validating image file'
         return Failure('No image file provided') unless file
 
-        validation = @validator.call(image_file: {
-                                       tempfile: file[:tempfile],
-                                       type: file[:type],
-                                       filename: file[:filename]
-                                     })
+        perform_validation(file)
+      end
 
-        if validation.success?
-          Success(file)
-        else
-          Failure(validation.errors.messages.join('; '))
-        end
+      def perform_validation(file)
+        validation = @validator.call(build_validation_params(file))
+        validation.success? ? Success(file) : Failure(validation.errors.messages.join('; '))
+      end
+
+      def build_validation_params(file)
+        {
+          image_file: {
+            tempfile: file[:tempfile],
+            type: file[:type],
+            filename: file[:filename]
+          }
+        }
       end
 
       def process_image(file, translate)

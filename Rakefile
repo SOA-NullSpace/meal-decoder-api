@@ -153,6 +153,7 @@ namespace :quality do
 end
 
 namespace :queues do
+  desc 'Configure AWS SQS settings for queue operations'
   task :config do
     require 'aws-sdk-sqs'
     require_relative 'config/environment'

@@ -4,12 +4,16 @@ require 'aws-sdk-sqs'
 
 module MealDecoder
   module Messaging
-    ## Queue wrapper for AWS SQS
+    # Queue wrapper for AWS SQS
     # Requires: AWS credentials loaded in ENV or through config file
-    # Creates and manages queues for the application
-
     class Queue
       IDLE_TIMEOUT = 5 # seconds
+
+      def initialize(queue_url, config)
+        @queue_url = queue_url
+        queue_config = QueueConfig.new(config)
+        @sqs = Aws::SQS::Client.new(queue_config.credentials)
+      end
 
       # Encapsulates AWS configuration and credentials management
       # Provides a clean interface for accessing AWS credentials
@@ -25,12 +29,6 @@ module MealDecoder
             region: @config.AWS_REGION
           }
         end
-      end
-
-      def initialize(queue_url, config)
-        @queue_url = queue_url
-        queue_config = QueueConfig.new(config)
-        @sqs = Aws::SQS::Client.new(queue_config.credentials)
       end
 
       ## Sends message to queue
