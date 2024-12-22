@@ -26,9 +26,9 @@ module MealDecoder
           result = @api.detect_text(image_path)
 
           _(result).wont_be_empty
-          _(result.find { |r| r[:detected_text] == '瘦肉炒麵' }).wont_be_nil
-          _(result.find { |r| r[:detected_text] == '海鮮炒麵' }).wont_be_nil
-          _(result.find { |r| r[:detected_text] == '牛肉炒麵' }).wont_be_nil
+          _(result.find { |text_result| text_result[:detected_text] == '瘦肉炒麵' }).wont_be_nil
+          _(result.find { |text_result| text_result[:detected_text] == '海鮮炒麵' }).wont_be_nil
+          _(result.find { |text_result| text_result[:detected_text] == '牛肉炒麵' }).wont_be_nil
         end
       end
     end

@@ -9,6 +9,7 @@ end
 # Define a test queue class
 module MealDecoder
   module Test
+    # Test implementation of message queue for specs
     class TestQueue
       def send(message)
         puts "Test queue received message: #{message}"

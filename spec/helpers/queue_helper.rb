@@ -13,9 +13,7 @@ module MealDecoder
         SecureRandom.uuid # Return a fake message ID
       end
 
-      def messages
-        @messages
-      end
+      attr_reader :messages
 
       def clear
         @messages = []

@@ -23,7 +23,7 @@ module MealDecoder
 
       # Create a mock queue that succeeds
       @mock_queue = Minitest::Mock.new
-      def @mock_queue.send(message)
+      def @mock_queue.send(_message)
         'fake_message_id'
       end
     end
