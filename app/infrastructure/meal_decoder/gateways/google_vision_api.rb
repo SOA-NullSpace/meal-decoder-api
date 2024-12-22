@@ -60,12 +60,12 @@ module MealDecoder
         request = Net::HTTP::Post.new(URI.parse("#{BASE_URL}?key=#{@api_key}"))
         request.content_type = 'application/json'
         request.body = JSON.dump({
-          requests: [{
-            image: { content: Base64.strict_encode64(File.read(image_path)) },
-            features: [{ type: 'TEXT_DETECTION', maxResults: 50 }],
-            imageContext: { languageHints: %w[en zh-TW zh-CN] }
-          }]
-        })
+                                   requests: [{
+                                     image: { content: Base64.strict_encode64(File.read(image_path)) },
+                                     features: [{ type: 'TEXT_DETECTION', maxResults: 50 }],
+                                     imageContext: { languageHints: %w[en zh-TW zh-CN] }
+                                   }]
+                                 })
         request
       end
 

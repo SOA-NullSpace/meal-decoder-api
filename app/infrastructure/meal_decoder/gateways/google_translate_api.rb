@@ -42,9 +42,9 @@ module MealDecoder
         Net::HTTP::Post.new(build_uri).tap do |req|
           req.content_type = 'application/json'
           req.body = JSON.dump({
-            q: text,
-            target: target_language
-          })
+                                 q: text,
+                                 target: target_language
+                               })
         end
       end
 
@@ -57,7 +57,7 @@ module MealDecoder
 
       def handle_translation_error(error)
         case error
-        when Net::HTTPServerException
+        when Net::HTTPClientException
           raise "Translation API error: #{error.message}"
         when JSON::ParserError
           raise 'Invalid response from translation service'

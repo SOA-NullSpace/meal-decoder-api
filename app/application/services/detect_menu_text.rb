@@ -26,10 +26,10 @@ module MealDecoder
         return Failure('No image file provided') unless file
 
         validation = @validator.call(image_file: {
-          tempfile: file[:tempfile],
-          type: file[:type],
-          filename: file[:filename]
-        })
+                                       tempfile: file[:tempfile],
+                                       type: file[:type],
+                                       filename: file[:filename]
+                                     })
 
         if validation.success?
           Success(file)
