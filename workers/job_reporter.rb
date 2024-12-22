@@ -6,6 +6,14 @@ module MealDecoder
   module Workers
     # Handles job progress reporting through Faye websockets
     class JobReporter
+      def initialize
+        @progress_publisher = nil
+      end
+
+      def report_progress(percent, message)
+        @progress_publisher&.publish({ percent:, message: })
+      end
+
       def report_with_interval(seconds, start_percent, end_percent, &)
         calculator = ProgressCalculator.new(seconds, start_percent, end_percent)
         report_progress_steps(seconds, calculator, &)
