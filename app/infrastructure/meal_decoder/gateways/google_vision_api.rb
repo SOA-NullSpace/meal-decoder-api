@@ -186,7 +186,7 @@ module MealDecoder
       end
 
       def format_output(text_results, translation_options)
-        return ResultFormatter.format_basic_results(text_results) unless translation_options[:enabled]
+        return ResultFormatter.format_basic_results(text_results) unless translation_options[:translate]
 
         translate_text_results(text_results)
       rescue StandardError => error

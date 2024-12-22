@@ -15,7 +15,7 @@ module MealDecoder
       end
 
       def translate(text, target_language = 'en')
-        return '' if text.blank?
+        return '' if text.nil? || text.strip.empty?
 
         response = TranslationRequestSender.new(@api_key).send_request(text, target_language)
         ResponseParser.parse(response)
@@ -32,15 +32,24 @@ module MealDecoder
       end
 
       def send_request(text, target_language)
-        request = TranslationRequestBuilder.new(text, target_language, @api_key).build
-        @http_client.send(request)
+        uri = URI.parse(GoogleTranslateAPI::BASE_URL + "?key=#{@api_key}")
+        request = Net::HTTP::Post.new(uri)
+        request.content_type = 'application/json'
+        request.body = JSON.dump(
+          q: text,
+          target: target_language
+        )
+
+        Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+          http.request(request)
+        end
       end
     end
 
     # Manages HTTP communication
-    class HttpRequestExecutor
-      def self.execute(request)
-        uri = URI.parse(request.path)
+    class HttpClient
+      def send(request)
+        uri = URI.parse(GoogleTranslateAPI::BASE_URL + "?key=#{request.api_key}")
         Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
           http.request(request)
         end
@@ -53,16 +62,25 @@ module MealDecoder
         @text = text
         @target_language = target_language
         @api_key = api_key
-        @request_path = "#{GoogleTranslateAPI::BASE_URL}?key=#{@api_key}"
+        @request_path = build_request_path
       end
 
       def build
-        request = Net::HTTP::Post.new(@request_path)
+        request = create_request
         configure_request(request)
         request
       end
 
       private
+
+      def build_request_path
+        "#{GoogleTranslateAPI::BASE_URL}?key=#{@api_key}"
+      end
+
+      def create_request
+        uri = URI.parse(@request_path)
+        Net::HTTP::Post.new(uri)
+      end
 
       def configure_request(request)
         request.content_type = 'application/json'
