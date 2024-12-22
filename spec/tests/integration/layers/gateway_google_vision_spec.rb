@@ -26,13 +26,9 @@ module MealDecoder
           result = @api.detect_text(image_path)
 
           _(result).wont_be_empty
-          # Check for specific menu items
-          _(@results['text_menu_img']['text']).must_include '瘦肉炒麵'
-          _(@results['text_menu_img']['text']).must_include '海鮮炒麵'
-          _(@results['text_menu_img']['text']).must_include '牛肉炒麵'
-
-          # Check full text matches
-          _(result).must_equal @results['text_menu_img']['text']
+          _(result.find { |r| r[:detected_text] == '瘦肉炒麵' }).wont_be_nil
+          _(result.find { |r| r[:detected_text] == '海鮮炒麵' }).wont_be_nil
+          _(result.find { |r| r[:detected_text] == '牛肉炒麵' }).wont_be_nil
         end
       end
     end

@@ -4,22 +4,26 @@ module MealDecoder
   module Database
     # Object-Relational Mapper for Dishes
     class DishOrm < Sequel::Model(:dishes)
+      unrestrict_primary_key
       plugin :timestamps, update_on_create: true
       plugin :validation_helpers
+      plugin :whitelist_security
+
+      set_allowed_columns :name, :status, :message_id
+
+      many_to_many :ingredients,
+                   class: :'MealDecoder::Database::IngredientOrm',
+                   join_table: :dishes_ingredients,
+                   left_key: :dish_id,
+                   right_key: :ingredient_id
 
       def validate
         super
         validates_presence :name
         validates_unique :name
         validates_max_length 100, :name
-        # Allow letters, numbers, and spaces in dish names
-        validates_format(/\A[[:print:]]+\z/u, :name, message: 'name must be printable characters')
+        validates_format(/\A[\p{L}\p{N}\s]+\z/u, :name, message: 'name must contain only letters, numbers and spaces')
       end
-
-      many_to_many :ingredients,
-                   class: :'MealDecoder::Database::IngredientOrm',
-                   join_table: :dishes_ingredients,
-                   left_key: :dish_id, right_key: :ingredient_id
 
       def self.find_or_create(dish_info)
         first(name: dish_info[:name]) || create(dish_info)

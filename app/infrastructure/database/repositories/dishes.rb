@@ -52,6 +52,44 @@ module MealDecoder
 
         private
 
+        def create_or_update_dish(entity)
+          Database::DishOrm.find_or_create(
+            name: entity.name,
+            status: entity.status || 'processing',
+            message_id: entity.message_id
+          )
+        end
+
+        def update_ingredients(db_dish, ingredients)
+          return unless ingredients&.any?
+
+          ingredient_records = ingredients.map do |ingredient_name|
+            Database::IngredientOrm.find_or_create(name: ingredient_name)
+          end
+
+          # Remove existing ingredients if any
+          db_dish.remove_all_ingredients if db_dish.ingredients.any?
+
+          # Add new ingredients via association
+          ingredient_records.each do |ingredient|
+            db_dish.add_ingredient(ingredient)
+          end
+        end
+
+        def rebuild_entity(db_record)
+          return nil unless db_record
+
+          ingredients = db_record.ingredients.map(&:name)
+
+          Entity::Dish.new(
+            id: db_record.id,
+            name: db_record.name,
+            ingredients:,
+            status: db_record.status,
+            message_id: db_record.message_id
+          )
+        end
+
         def create_dish_transaction(entity)
           db_dish = create_or_update_dish(entity)
           ingredients = entity.ingredients

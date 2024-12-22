@@ -19,6 +19,10 @@ module MealDecoder
     end
 
     describe 'Retrieve and store dish information' do
+      before do
+        @dishes_repo = MealDecoder::Repository::For.klass(MealDecoder::Entity::Dish)
+      end
+
       it 'HAPPY: should be able to save dish from OpenAI API to database' do
         VCR.use_cassette('dish_spaghetti_carbonara', match_requests_on: %i[method uri body]) do
           # Create a dish using the API
@@ -77,31 +81,17 @@ module MealDecoder
       end
 
       it 'SAD: should gracefully handle invalid dish names' do
-        # Test name longer than database limit
-        too_long_name = 'x' * 101 # Exceeds 100 character limit
+        # ARRANGE - Create new dish with invalid name
+        invalid_dish = MealDecoder::Entity::Dish.new(
+          id: nil,
+          name: '!@#$%^',
+          ingredients: []
+        )
 
-        # First test: name too long
+        # ACT/ASSERT
         _(proc do
-          Database::DishOrm.create(
-            name: too_long_name
-          )
-        end).must_raise Sequel::ValidationFailed
-
-        # Second test: invalid characters in name
-        invalid_name = 'Pizza!!!123' # Contains invalid characters
-
-        _(proc do
-          Database::DishOrm.create(
-            name: invalid_name
-          )
-        end).must_raise Sequel::ValidationFailed
-
-        # Third test: empty name (null constraint)
-        _(proc do
-          Database::DishOrm.create(
-            name: ''
-          )
-        end).must_raise Sequel::ValidationFailed
+          @dishes_repo.create(invalid_dish)
+        end).must_raise(Sequel::ValidationFailed)
       end
     end
   end

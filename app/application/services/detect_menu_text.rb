@@ -39,7 +39,7 @@ module MealDecoder
       end
 
       def format_text(text)
-        return Success([]) if text.blank?
+        return Success([]) if text.nil? || text.empty?
 
         Success(text)
       rescue StandardError => error
