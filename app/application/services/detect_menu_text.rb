@@ -4,6 +4,8 @@ require 'dry/monads'
 
 module MealDecoder
   module Services
+    # Service for detecting and processing text from menu images
+    # Handles image validation, text detection, and optional translation
     class DetectMenuText
       include Dry::Monads[:result]
 
@@ -12,10 +14,10 @@ module MealDecoder
         @gateway = Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
       end
 
-      def call(image_file, translate: false)
+      def call(image_file, translation_options = {})
         puts "\nProcessing text detection request"
         validate_file(image_file)
-          .bind { |file| process_image(file, translate) }
+          .bind { |file| process_image(file, translation_options) }
           .bind { |text| format_text(text) }
       end
 
@@ -25,32 +27,38 @@ module MealDecoder
         puts 'Validating image file'
         return Failure('No image file provided') unless file
 
-        validation = @validator.call(image_file: {
-          tempfile: file[:tempfile],
-          type: file[:type],
-          filename: file[:filename]
-        })
-
-        if validation.success?
-          Success(file)
-        else
-          Failure(validation.errors.messages.join('; '))
-        end
+        validation = @validator.call(FileParamsBuilder.build(file))
+        validation.success? ? Success(file) : Failure(validation.errors.messages.join('; '))
       end
 
-      def process_image(file, translate)
-        text = @gateway.detect_text(file[:tempfile].path, translate:)
+      def process_image(file, translation_options)
+        text = @gateway.detect_text(file[:tempfile].path, translation_options)
         Success(text)
       rescue StandardError => error
         Failure("Text detection error: #{error.message}")
       end
 
       def format_text(text)
-        return Success([]) if text.nil? || text.empty?
+        return Success([]) if text.empty?
 
         Success(text)
-      rescue StandardError => e
-        Failure("Error formatting text: #{e.message}")
+      rescue StandardError => error
+        Failure("Error formatting text: #{error.message}")
+      end
+    end
+
+    # Builds parameter hash for file validation
+    module FileParamsBuilder
+      module_function
+
+      def build(file)
+        {
+          image_file: {
+            tempfile: file[:tempfile],
+            type: file[:type],
+            filename: file[:filename]
+          }
+        }
       end
     end
   end

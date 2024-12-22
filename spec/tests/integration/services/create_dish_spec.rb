@@ -20,11 +20,19 @@ module MealDecoder
         CLONE_QUEUE_URL: MealDecoder::App.config.CLONE_QUEUE_URL
       )
       VcrHelper.configure_vcr_for_apis(@config)
+
+      # Create a mock queue that succeeds
+      @mock_queue = Minitest::Mock.new
+      def @mock_queue.send(_message)
+        'fake_message_id'
+      end
     end
 
     it 'HAPPY: should queue dish creation request' do
       VCR.use_cassette('service_create_pizza') do
-        result = Services::CreateDish.new.call(
+        # Use the service with our mock queue
+        service = Services::CreateDish.with_queue(@mock_queue)
+        result = service.call(
           dish_name: 'Pizza',
           session: @session
         )
@@ -39,7 +47,8 @@ module MealDecoder
 
     it 'SAD: should return Failure for invalid input' do
       VCR.use_cassette('service_create_invalid_dish') do
-        result = Services::CreateDish.new.call(
+        service = Services::CreateDish.with_queue(@mock_queue)
+        result = service.call(
           dish_name: '',
           session: @session
         )

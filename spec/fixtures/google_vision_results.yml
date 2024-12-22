@@ -1,33 +1,63 @@
 ---
 text_menu_img:
-  text: |-
-    炒麵
-    瘦肉炒麵
-    (意麵/油
-    豬肝炒麵
-    (意麵/油
-    海鮮炒麵
-    (意麵/油
-    牛肉炒麵
-    (意麵/油
-    粥、飯、麵食館
-    羊肉炒麵
-    (意麵/油
-    蝦仁炒麵
-    (意麵/油
-    請先付款,謝謝!
-    花枝炒麵
-    (意麵/
-    貢丸炒麵
-    (意麵/
-    干貝炒麵
-    (意麵/
-    湯麵
-    Cola
-    瘦肉湯麵
-    肝連肉湯麵
-    (意麵/油麵/烏龍/
-    (意麵/油麵/烏龍
+  text:
+    status: 'ok'
+    message: 'Text detected'
+    data:
+      - detected_text: '炒麵'
+        translated: 'Fried noodles'
+      - detected_text: '瘦肉炒麵'
+        translated: 'Lean pork fried noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '豬肝炒麵'
+        translated: 'Pork liver fried noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '海鮮炒麵'
+        translated: 'Seafood Fried Noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '牛肉炒麵'
+        translated: 'Beef fried noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '粥、飯、麵食館'
+        translated: 'Porridge, rice and pasta restaurant'
+      - detected_text: '羊肉炒麵'
+        translated: 'Lamb fried noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '蝦仁炒麵'
+        translated: 'Shrimp Fried Noodles'
+      - detected_text: '(意麵/油'
+        translated: '(pasta/oil'
+      - detected_text: '請先付款,謝謝!'
+        translated: 'Please pay first, thank you!'
+      - detected_text: '花枝炒麵'
+        translated: 'Huazhi Fried Noodles'
+      - detected_text: '(意麵/'
+        translated: '(pasta/'
+      - detected_text: '貢丸炒麵'
+        translated: 'Fried Noodles with Tomato Balls'
+      - detected_text: '(意麵/'
+        translated: '(pasta/'
+      - detected_text: '干貝炒麵'
+        translated: 'Fried noodles with scallops'
+      - detected_text: '(意麵/'
+        translated: '(pasta/'
+      - detected_text: '湯麵'
+        translated: 'noodle soup'
+      - detected_text: 'Cola'
+        translated: 'Cola'
+      - detected_text: '瘦肉湯麵'
+        translated: 'Lean meat noodle soup'
+      - detected_text: '肝連肉湯麵'
+        translated: 'Liver and pork noodle soup'
+      - detected_text: '(意麵/油麵/烏龍/'
+        translated: '(Pasta/Oil noodles/Oolong/'
+      - detected_text: '(意麵/油麵/烏龍'
+        translated: '(Pasta/Oil noodles/Oolong'
 blank_img:
   text: ''
 error_responses:

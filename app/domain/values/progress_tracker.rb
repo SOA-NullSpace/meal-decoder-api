@@ -2,9 +2,10 @@
 
 require 'securerandom'
 
-# app/domain/values/progress_tracker.rb
 module MealDecoder
   module Value
+    # Value object for tracking progress of asynchronous operations
+    # Provides a channel-based mechanism for real-time status updates
     class ProgressTracker
       attr_reader :channel_id, :status, :task
 

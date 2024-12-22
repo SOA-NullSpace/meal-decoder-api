@@ -6,12 +6,26 @@ def app
   MealDecoder::App
 end
 
+# Define a test queue class
+module MealDecoder
+  module Test
+    # Test implementation of message queue for specs
+    class TestQueue
+      def send(message)
+        puts "Test queue received message: #{message}"
+        'fake_message_id'
+      end
+    end
+  end
+end
+
 describe 'API acceptance tests' do
   include Rack::Test::Methods
   include MiniTestSetup
 
   before do
     DatabaseHelper.wipe_database
+
     @config = OpenStruct.new(
       OPENAI_API_KEY: MealDecoder::App.config.OPENAI_API_KEY,
       GOOGLE_CLOUD_API_TOKEN: MealDecoder::App.config.GOOGLE_CLOUD_API_TOKEN,
@@ -21,6 +35,13 @@ describe 'API acceptance tests' do
       CLONE_QUEUE: MealDecoder::App.config.CLONE_QUEUE
     )
     VcrHelper.configure_vcr_for_apis(@config)
+
+    # Replace the QueueFactory create method
+    MealDecoder::Services::QueueFactory.class_eval do
+      def self.create(_config = nil)
+        MealDecoder::Test::TestQueue.new
+      end
+    end
   end
 
   describe 'Dish API tests' do
@@ -31,11 +52,14 @@ describe 'API acceptance tests' do
 
       VCR.use_cassette('dish_carbonara') do
         post '/api/v1/dishes', dish_data
-        _(last_response.status).must_equal 202 # Changed from 200 to 202
+        _(last_response.status).must_equal 202
 
         response = JSON.parse(last_response.body)
         _(response['status']).must_equal 'processing'
         _(response['data']['dish_name']).must_equal 'Spaghetti Carbonara'
+        _(response['data']['message_id']).wont_be_nil
+        _(response['progress']).wont_be_nil
+        _(response['progress']['channel']).wont_be_nil
       end
     end
 
@@ -52,6 +76,8 @@ describe 'API acceptance tests' do
           response = JSON.parse(last_response.body)
           _(response['status']).must_equal 'processing'
           _(response['data']['dish_name']).must_equal dish_name
+          _(response['data']['message_id']).wont_be_nil
+          _(response['progress']).wont_be_nil
         end
       end
     end
