@@ -183,7 +183,22 @@ module MealDecoder
 
     # Background worker for processing dish requests asynchronously
     class DishWorker
+      # Environment variables setup
+      Figaro.application = Figaro::Application.new(
+        environment: ENV['RACK_ENV'] || 'development',
+        path: File.expand_path('config/secrets.yml')
+      )
+      Figaro.load
+      def self.config = Figaro.env
+
+      Shoryuken.sqs_client = Aws::SQS::Client.new(
+        access_key_id: config.AWS_ACCESS_KEY_ID,
+        secret_access_key: config.AWS_SECRET_ACCESS_KEY,
+        region: config.AWS_REGION
+      )
+
       include Shoryuken::Worker
+      shoryuken_options queue: config.CLONE_QUEUE, auto_delete: true
 
       def initialize
         super
@@ -202,8 +217,7 @@ module MealDecoder
 
       def process_dish_job(request)
         request_data = RequestParser.parse(request)
-        job = JobReporter.new(request, self.class.config)
-        reporter = ProgressReporter.new(job)
+        reporter = ProgressReporter.new(JobReporter.new)
 
         execute_job_phases(request_data, reporter)
       end
