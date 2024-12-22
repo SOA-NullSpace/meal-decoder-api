@@ -238,7 +238,11 @@ module MealDecoder
 
           # POST /api/v1/detect_text
           routing.post 'detect_text' do
-            result = Services::DetectMenuText.new.call(routing.params['image_file'])
+            translate = routing.params['translate']&.downcase == 'true'
+            result = Services::DetectMenuText.new.call(
+              routing.params['image_file'],
+              translate:
+            )
 
             status, body = if result.success?
                              [200, {
