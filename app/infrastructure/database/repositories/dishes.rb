@@ -46,15 +46,16 @@ module MealDecoder
 
         def update_status(message_id, new_status)
           process_status_update(message_id, new_status)
-        rescue StandardError => e
-          handle_status_update_error(e)
+        rescue StandardError => error
+          handle_status_update_error(error)
         end
 
         private
 
         def create_dish_transaction(entity)
           db_dish = create_or_update_dish(entity)
-          update_ingredients(db_dish, entity.ingredients) if entity.ingredients&.any?
+          ingredients = entity.ingredients
+          update_ingredients(db_dish, ingredients) if ingredients&.any?
           puts "Dish created/updated: #{db_dish.inspect}"
           db_dish
         end

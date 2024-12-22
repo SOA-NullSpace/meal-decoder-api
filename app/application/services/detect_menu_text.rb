@@ -14,10 +14,10 @@ module MealDecoder
         @gateway = Gateways::GoogleVisionAPI.new(App.config.GOOGLE_CLOUD_API_TOKEN)
       end
 
-      def call(image_file, translate: false)
+      def call(image_file, translation_options = {})
         puts "\nProcessing text detection request"
         validate_file(image_file)
-          .bind { |file| process_image(file, translate) }
+          .bind { |file| process_image(file, translation_options) }
           .bind { |text| format_text(text) }
       end
 
@@ -27,15 +27,31 @@ module MealDecoder
         puts 'Validating image file'
         return Failure('No image file provided') unless file
 
-        perform_validation(file)
-      end
-
-      def perform_validation(file)
-        validation = @validator.call(build_validation_params(file))
+        validation = @validator.call(FileParamsBuilder.build(file))
         validation.success? ? Success(file) : Failure(validation.errors.messages.join('; '))
       end
 
-      def build_validation_params(file)
+      def process_image(file, translation_options)
+        text = @gateway.detect_text(file[:tempfile].path, translation_options)
+        Success(text)
+      rescue StandardError => error
+        Failure("Text detection error: #{error.message}")
+      end
+
+      def format_text(text)
+        return Success([]) if text.blank?
+
+        Success(text)
+      rescue StandardError => error
+        Failure("Error formatting text: #{error.message}")
+      end
+    end
+
+    # Builds parameter hash for file validation
+    module FileParamsBuilder
+      module_function
+
+      def build(file)
         {
           image_file: {
             tempfile: file[:tempfile],
@@ -43,21 +59,6 @@ module MealDecoder
             filename: file[:filename]
           }
         }
-      end
-
-      def process_image(file, translate)
-        text = @gateway.detect_text(file[:tempfile].path, translate:)
-        Success(text)
-      rescue StandardError => error
-        Failure("Text detection error: #{error.message}")
-      end
-
-      def format_text(text)
-        return Success([]) if text.nil? || text.empty?
-
-        Success(text)
-      rescue StandardError => e
-        Failure("Error formatting text: #{e.message}")
       end
     end
   end

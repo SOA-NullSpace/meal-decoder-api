@@ -9,7 +9,114 @@ require 'shoryuken'
 
 module MealDecoder
   module Workers
-    # Processes dish requests by fetching ingredients and updating database records
+    # Handles request parsing and validation
+    class RequestParser
+      def self.parse(request)
+        case request
+        when String then parse_json_string(request)
+        else request
+        end
+      end
+
+      def self.extract_info(request)
+        {
+          dish_name: request['dish_name'],
+          message_id: request['message_id'] || request['request_id'],
+          channel_id: request['channel_id']
+        }
+      end
+
+      private_class_method def self.parse_json_string(request)
+        JSON.parse(request)
+      rescue JSON::ParserError
+        JSON.parse(request.gsub('=>', ':'))
+      end
+    end
+
+    # Manages dish entity creation and updates
+    class DishBuilder
+      def self.build_initial(info)
+        Entity::Dish.new(
+          id: nil,
+          name: info[:dish_name],
+          ingredients: [],
+          message_id: info[:message_id],
+          status: 'processing'
+        )
+      end
+
+      def self.build_complete(existing, processed, info)
+        Entity::Dish.new(
+          id: existing.id,
+          name: info[:dish_name],
+          ingredients: processed.ingredients,
+          message_id: info[:message_id],
+          status: 'completed'
+        )
+      end
+    end
+
+    # Formats messages for various worker operations
+    class MessageFormatter
+      def self.completion_message(dish)
+        "Successfully processed dish: #{dish.name} with #{dish.ingredients.count} ingredients"
+      end
+    end
+
+    # Manages progress reporting for dish processing jobs
+    class ProgressReporter
+      def initialize(job_reporter)
+        @job_reporter = job_reporter
+      end
+
+      def report_initial_progress
+        @job_reporter.report_progress(0, 'Started processing dish request')
+        @job_reporter.report_progress(10, 'Initializing dish processing...')
+      end
+
+      def report_completion(completed_dish)
+        @job_reporter.report_progress(
+          100,
+          MessageFormatter.completion_message(completed_dish)
+        )
+      end
+    end
+
+    # Handles dish status update operations
+    class StatusManager
+      def self.update_on_error(message_id)
+        return unless message_id
+
+        Repository::For.klass(Entity::Dish).update_status(message_id, 'failed')
+      end
+
+      def self.update_to_processing(existing_dish, message_id)
+        puts "Found existing dish #{existing_dish.id}, updating status to processing"
+        Repository::For.klass(Entity::Dish).update_status(message_id, 'processing')
+        existing_dish
+      end
+
+      def self.update_to_completed(message_id)
+        Repository::For.klass(Entity::Dish).update_status(message_id, 'completed')
+      end
+    end
+
+    # Custom error class for request validation failures
+    class ValidationError < StandardError; end
+
+    # Handles request validation logic and error handling
+    class RequestValidator
+      def self.validate!(request_data)
+        raise ValidationError, 'Invalid request data' unless request_data
+
+        dish_name = request_data['dish_name']
+        return if dish_name && !dish_name.empty?
+
+        raise ValidationError, 'Invalid dish name'
+      end
+    end
+
+    # Processes dish creation requests and manages dish lifecycle
     class DishProcessor
       def initialize(api_key = App.config.OPENAI_API_KEY)
         @mapper = Mappers::DishMapper.new(
@@ -18,68 +125,32 @@ module MealDecoder
       end
 
       def process_request(request)
-        request_info = extract_request_info(request)
+        request_info = RequestParser.extract_info(request)
         process_dish_request(request_info)
-      rescue StandardError => e
-        handle_processing_error(e, request_info[:message_id])
+      rescue StandardError => error
+        handle_processing_error(error, request_info[:message_id])
       end
 
       private
 
-      def extract_request_info(request)
-        {
-          dish_name: request['dish_name'],
-          message_id: request['message_id'] || request['request_id'],
-          channel_id: request['channel_id']
-        }
-      end
-
       def process_dish_request(info)
-        log_request_info(info)
         existing_dish = find_or_create_initial_dish(info)
         processed_dish = fetch_dish_info(info[:dish_name])
         store_complete_dish(existing_dish, processed_dish, info)
       end
 
-      def log_request_info(info)
-        puts "\n=== Processing dish request ==="
-        puts "Dish: #{info[:dish_name]}"
-        puts "Message ID: #{info[:message_id]}"
-        puts "Channel: #{info[:channel_id]}"
-      end
-
       def find_or_create_initial_dish(info)
         repository = Repository::For.klass(Entity::Dish)
-        existing = repository.find_by_message_id(info[:message_id])
-
-        if existing
-          update_existing_dish(existing, info[:message_id])
-        else
-          create_initial_dish(info)
-        end
-      end
-
-      def update_existing_dish(existing, message_id)
-        puts "Found existing dish #{existing.id}, updating status to processing"
-        Repository::For.klass(Entity::Dish).update_status(message_id, 'processing')
-        existing
+        message_id = info[:message_id]
+        existing = repository.find_by_message_id(message_id)
+        existing ? StatusManager.update_to_processing(existing, message_id) : create_initial_dish(info)
       end
 
       def create_initial_dish(info)
-        initial_dish = build_initial_dish(info)
+        initial_dish = DishBuilder.build_initial(info)
         stored_dish = Repository::For.entity(initial_dish).create(initial_dish)
         puts "Created initial dish with ID: #{stored_dish.id}"
         stored_dish
-      end
-
-      def build_initial_dish(info)
-        Entity::Dish.new(
-          id: nil,
-          name: info[:dish_name],
-          ingredients: [],
-          message_id: info[:message_id],
-          status: 'processing'
-        )
       end
 
       def fetch_dish_info(dish_name)
@@ -90,21 +161,7 @@ module MealDecoder
       end
 
       def store_complete_dish(existing, processed, info)
-        complete_dish = build_complete_dish(existing, processed, info)
-        store_and_verify_dish(complete_dish)
-      end
-
-      def build_complete_dish(existing, processed, info)
-        Entity::Dish.new(
-          id: existing.id,
-          name: info[:dish_name],
-          ingredients: processed.ingredients,
-          message_id: info[:message_id],
-          status: 'completed'
-        )
-      end
-
-      def store_and_verify_dish(complete_dish)
+        complete_dish = DishBuilder.build_complete(existing, processed, info)
         stored_dish = Repository::For.entity(complete_dish).create(complete_dish)
         verify_storage(stored_dish)
         stored_dish
@@ -119,127 +176,59 @@ module MealDecoder
       def handle_processing_error(error, message_id)
         puts "PROCESSOR ERROR: #{error.message}"
         puts error.backtrace
-        update_status_on_error(message_id)
+        StatusManager.update_on_error(message_id)
         raise
-      end
-
-      def update_status_on_error(message_id)
-        return unless message_id
-
-        Repository::For.klass(Entity::Dish).update_status(message_id, 'failed')
       end
     end
 
-    # Handles background processing of dish requests using Shoryuken
+    # Background worker for processing dish requests asynchronously
     class DishWorker
       include Shoryuken::Worker
-
-      class << self
-        def setup_environment
-          configure_figaro
-          configure_shoryuken
-        end
-
-        def config
-          Figaro.env
-        end
-
-        private
-
-        def configure_figaro
-          Figaro.application = Figaro::Application.new(
-            environment: ENV['RACK_ENV'] || 'development',
-            path: File.expand_path('config/secrets.yml')
-          )
-          Figaro.load
-        end
-
-        def configure_shoryuken
-          Shoryuken.sqs_client = Aws::SQS::Client.new(
-            access_key_id: config.AWS_ACCESS_KEY_ID,
-            secret_access_key: config.AWS_SECRET_ACCESS_KEY,
-            region: config.AWS_REGION
-          )
-        end
-      end
-
-      setup_environment
-      shoryuken_options queue: config.CLONE_QUEUE, auto_delete: true
 
       def initialize
         super
         @processor = DishProcessor.new
+        @validator = RequestValidator
       end
 
       def perform(_sqs_msg, request)
         process_dish_job(request)
-      rescue StandardError => e
-        handle_worker_error(e)
+      rescue StandardError => error
+        handle_worker_error(error)
         raise
       end
 
       private
 
       def process_dish_job(request)
-        request_data = parse_request(request)
+        request_data = RequestParser.parse(request)
         job = JobReporter.new(request, self.class.config)
+        reporter = ProgressReporter.new(job)
 
-        execute_job_phases(request_data, job)
+        execute_job_phases(request_data, reporter)
       end
 
-      def execute_job_phases(request_data, job)
-        validate_request!(request_data)
-        report_initial_progress(job)
-        process_dish(request_data, job)
+      def execute_job_phases(request_data, reporter)
+        @validator.validate!(request_data)
+        reporter.report_initial_progress
+        process_dish(request_data, reporter)
       end
 
-      def report_initial_progress(job)
-        job.report_progress(0, 'Started processing dish request')
-        job.report_progress(10, 'Initializing dish processing...')
-      end
-
-      def process_dish(request_data, job)
-        job.report_progress(30, 'Fetching dish information...')
+      def process_dish(request_data, reporter)
         dish = @processor.process_request(request_data)
-
-        job.report_progress(70, 'Saving dish information to database...')
-        verify_and_complete_dish(dish, job)
+        verify_and_complete_dish(dish, reporter)
       end
 
-      def verify_and_complete_dish(dish, job)
+      def verify_and_complete_dish(dish, reporter)
         raise 'Failed to process dish: No ingredients found' unless dish&.ingredients&.any?
 
-        Repository::For.klass(Entity::Dish).update_status(dish.message_id, 'completed')
-        report_completion(dish, job)
-      end
-
-      def report_completion(dish, job)
-        job.report_progress(
-          100,
-          "Successfully processed dish: #{dish.name} with #{dish.ingredients.count} ingredients"
-        )
+        StatusManager.update_to_completed(dish.message_id)
+        reporter.report_completion(dish)
       end
 
       def handle_worker_error(error)
         puts "WORKER ERROR: #{error.message}"
         puts error.backtrace
-      end
-
-      def parse_request(request)
-        return request unless request.is_a?(String)
-
-        begin
-          JSON.parse(request)
-        rescue JSON::ParserError
-          JSON.parse(request.gsub('=>', ':'))
-        end
-      end
-
-      def validate_request!(request_data)
-        raise 'Invalid request data' unless request_data
-
-        dish_name = request_data['dish_name']
-        raise 'Invalid dish name' if dish_name.nil? || dish_name.empty?
       end
     end
   end

@@ -21,8 +21,8 @@ module MealDecoder
       def send_progress_update(message)
         response = send_faye_request(message)
         handle_response(response)
-      rescue StandardError => e
-        handle_publishing_error(e)
+      rescue StandardError => error
+        handle_publishing_error(error)
       end
 
       def send_faye_request(message)

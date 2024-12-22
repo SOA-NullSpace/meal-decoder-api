@@ -168,9 +168,9 @@ module MealDecoder
                   dish_data
                 end
               }.to_json
-            rescue StandardError => e
-              puts "Error fetching dishes: #{e.message}"
-              puts e.backtrace
+            rescue StandardError => error
+              puts "Error fetching dishes: #{error.message}"
+              puts error.backtrace
               response.status = 500
               { message: "Error fetching dishes: #{e.message}" }.to_json
             end
