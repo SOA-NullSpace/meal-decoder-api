@@ -181,6 +181,21 @@ module MealDecoder
       end
     end
 
+    # Handles request processing and reporter initialization
+    # Extracts channel_id and creates progress reporter for job monitoring
+    class RequestProcessor
+      def initialize(reporter_class, request_data)
+        @reporter_class = reporter_class
+        @request_data = request_data
+      end
+
+      def process
+        channel_id = @request_data.fetch('channel_id')
+        job = @reporter_class.new(channel_id, MealDecoder::App.config)
+        ProgressReporter.new(job)
+      end
+    end
+
     # Background worker for processing dish requests asynchronously
     class DishWorker
       # Environment variables setup
@@ -217,9 +232,10 @@ module MealDecoder
 
       def process_dish_job(request)
         request_data = RequestParser.parse(request)
-        reporter = ProgressReporter.new(JobReporter.new)
-
+        reporter = RequestProcessor.new(JobReporter, request_data).process
         execute_job_phases(request_data, reporter)
+      rescue KeyError => error
+        puts "Error: Missing required field - #{error.message}"
       end
 
       def execute_job_phases(request_data, reporter)

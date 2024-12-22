@@ -27,10 +27,13 @@ module MealDecoder
 
       def send_faye_request(message)
         faye_url = "#{@api_host}/faye"
-        puts "Publishing to Faye: #{faye_url}, channel: /progress/#{@channel_id}"
+        json_message = message.to_json
 
         HTTP.headers('Content-Type' => 'application/json')
-          .post(faye_url, json: build_message_payload(message))
+          .post(faye_url, json: {
+                  channel: "/progress/#{@channel_id}",
+                  data: json_message
+                })
       end
 
       def build_message_payload(message)
