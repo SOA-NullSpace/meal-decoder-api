@@ -43,6 +43,45 @@ module MealDecoder
       end
     end
 
+    # Handles translation API errors with appropriate fallback responses
+    class ErrorHandler
+      def self.handle_error(error)
+        case error
+        when Net::HTTPError, JSON::ParserError
+          ''
+        else
+          raise error
+        end
+      end
+    end
+
+    # Processes and extracts translation data from API responses
+    class ResponseParser
+      def self.parse(response)
+        return '' unless valid_response?(response)
+
+        extract_translation(response)
+      rescue JSON::ParserError
+        ''
+      end
+
+      class << self
+        private
+
+        def valid_response?(response)
+          response.is_a?(Net::HTTPSuccess)
+        end
+
+        def extract_translation(response)
+          json_response = JSON.parse(response.body)
+          translations = json_response.dig('data', 'translations')
+          return '' if translations&.empty?
+
+          translations.first['translatedText']
+        end
+      end
+    end
+
     # Coordinates translation process by managing API requests and responses
     # Handles the core translation workflow from request building to response parsing
     class TranslationService
